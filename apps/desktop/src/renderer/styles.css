@@ -274,6 +274,29 @@ body,
   font-size: 11px;
   color: var(--text-dim);
 }
+.mixer-smartfader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.smartfader-btn {
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  padding: 6px 8px;
+  white-space: nowrap;
+}
+.smartfader-btn.active {
+  background: linear-gradient(180deg, #ff8a3d, #ff5a5a);
+  color: #2a0f02;
+  border-color: var(--cue);
+  font-weight: 700;
+}
+.smartfader-bpm {
+  font-size: 11px;
+  color: var(--cue);
+  font-variant-numeric: tabular-nums;
+}
 
 /* statusbar */
 .statusbar {

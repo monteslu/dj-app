@@ -48,6 +48,7 @@ function deckControls(g: string): ControlDef[] {
     { group: g, key: DeckKeys.rateRange, default: 0.1, description: 'Rate range, e.g. 0.10 == ±10%' },
     { group: g, key: DeckKeys.rateDirection, default: 1 },
     { group: g, key: DeckKeys.rateRatio, default: 1, description: 'Effective rate ratio' },
+    { group: g, key: DeckKeys.rateRatioOverride, default: 0, description: 'Sync/SmartFader ratio override; 0=off' },
     { group: g, key: DeckKeys.bpm, default: 0, description: 'Effective BPM' },
     { group: g, key: DeckKeys.fileBpm, default: 0, description: 'Analyzed/original BPM' },
     { group: g, key: DeckKeys.keylock, default: 0, persist: true, description: 'Keylock on/off' },

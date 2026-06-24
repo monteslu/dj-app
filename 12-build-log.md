@@ -268,3 +268,53 @@ for ALL momentary controls (`CueControl.on`/`LoopControl.on` wrap it). Every Mix
 56 tests green (11 new loop/cue tests incl. the sample-accurate wrap). App boots clean. Hotcues,
 beatloops, manual loops, halve/double, reloop all wired end to end and visible on the waveform.
 Real loop-seam audio quality is an ear test (the crossfade logic is in place + structurally tested).
+
+---
+
+## Session 1 (cont) — M5: analysis + sync + Smart Fader
+
+The milestone that makes beatloops beat-accurate and brings the fork's headline feature to life.
+
+### New package: `@internal-dj/analysis`
+- `beats.ts` — the `Beats` beatgrid model (constant tempo: bpm + firstBeatFrame, in FRAMES).
+  nearest/next/prev beat, beatDistance (0..1), scale/translate/withBpm, JSON round-trip.
+- `beat-detector.ts` — a REAL, self-contained autocorrelation BPM+phase detector: onset-strength
+  envelope (half-wave-rectified energy flux @100Hz) → autocorrelation over a BPM range → phase via a
+  pulse-train correlation, with octave snapping toward the dance pocket. NO external WASM. The
+  essentia.js/qm-dsp-WASM swap drops in behind the same interface later.
+- `analysis.worker.ts` + protocol — runs detection off the main thread, sample data via SAB (no copy).
+- TESTED with synthetic click tracks: detects 120 and 128 BPM within 2.5bpm, finds phase within 30ms.
+  It actually works.
+
+### Sync engine + Smart Fader (`audio-engine/src/sync/`)
+- `sync-engine.ts` — `SyncEngine` (EngineSync analog): pick leader, follower rate = leaderBpm /
+  (followerBpm × halfDoubleFactor), + a capped proportional phase correction. Pure math; drives the
+  existing rate control. half/double tested (140 follower locks to 70 leader).
+- `smart-fader.ts` — **the fork's signature feature** (09), ported: crossfader →
+  targetBpm = lerp(leftBpm, rightBpm, t); both decks play at targetBpm (rate = targetBpm/fileBpm). No
+  half/double (strictly between the two BPMs — no octave jump, the fork's dc6aea69 fix). Fully tested:
+  hard-left→left bpm, hard-right→right bpm, center→avg, 90↔140 blend = 115 (no snap).
+
+### Key infra: the rate-ratio override
+Sync/SmartFader need ratios beyond the slider's ±10% (90↔140 = ratio 1.55). Added a
+`rate_ratio_override` control per deck: the worklet uses it as speed when >0, else the slider calc.
+Clean separation — sync writes the override, the user writes the slider, no fighting.
+
+### Wiring into the app
+- `AnalysisService` (renderer) wraps a Vite-bundled Web Worker (regular Workers DO bundle via
+  `new Worker(new URL(...))` — unlike AudioWorklets). Track load → analyze → set `file_bpm` → beatloops
+  + sync + smart fader all become live.
+- Smart Fader toggle + live target-BPM readout in the Mixer. (DDJ-FLX4 button mapping comes with M7.)
+
+### M5 status: COMPLETE
+76 tests green (25 new: beats, detector, sync, smart fader). App boots clean. Real BPM detection in a
+worker, beat-accurate loops, and the Smart Fader tempo blend all live. The fork feature survived the
+re-architecture and is cleaner than the C++ original (one control + the override, no sync-engine
+surgery).
+
+### Where we are after session 1
+M1 (first light) · M2 (keylock) · M4 (cues/loops) · M5 (analysis/sync/smartfader) all COMPLETE.
+6 packages + the Electron app, 76 tests, boots cross-origin-isolated with WebGPU. Skipped M3 (mixer
+polish — M1 already gave a working mixer). Remaining: M3 leftovers (PFL cue, VU, temp pitch-bend), M6
+(library/SQLite), M7 (controllers/Web MIDI + Mixxx mappings), M8 (effects), M9 (record/broadcast/stems).
+Everything pending a human ear/eye test on real hardware (no display + no Electron binary in this env).

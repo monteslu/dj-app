@@ -11,6 +11,15 @@ export { KeylockScaler } from './keylock-scaler.js';
 export type { Scaler, SourcePull } from './scaler.js';
 export { CueControl } from './controls/cue-control.js';
 export { LoopControl } from './controls/loop-control.js';
+export {
+  SyncEngine,
+  shortestBeatError,
+  type SyncMode,
+  type SyncDeck,
+  type DeckSyncState,
+} from './sync/sync-engine.js';
+export { SmartFader, type SmartFaderDeps } from './sync/smart-fader.js';
+export { sliderFromRateRatio } from './rate.js';
 export { calculateSpeed, rateRatioFromSlider } from './rate.js';
 export {
   getXfadeGains,

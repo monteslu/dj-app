@@ -13,7 +13,8 @@
     { "path": "../../packages/control-bus" },
     { "path": "../../packages/audio-engine" },
     { "path": "../../packages/codec" },
-    { "path": "../../packages/waveform" }
+    { "path": "../../packages/waveform" },
+    { "path": "../../packages/analysis" }
   ],
   "include": ["src/renderer/**/*", "src/shared/**/*"]
 }

@@ -1,0 +1,17 @@
+{
+  "name": "@internal-dj/analysis",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Track analysis: beat/BPM detection + beatgrid model. Built-in autocorrelation detector now; essentia.js/qm-dsp WASM swap later (05-library-and-data.md §6).",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./worker": "./src/analysis.worker.ts"
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "test": "vitest run"
+  }
+}

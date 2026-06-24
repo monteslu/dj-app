@@ -13,6 +13,7 @@ export default defineConfig({
       '@internal-dj/audio-engine': pkg('audio-engine'),
       '@internal-dj/codec': pkg('codec'),
       '@internal-dj/waveform': pkg('waveform'),
+      '@internal-dj/analysis': pkg('analysis'),
     },
   },
   test: {

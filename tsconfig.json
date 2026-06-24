@@ -5,6 +5,7 @@
     { "path": "./packages/audio-engine" },
     { "path": "./packages/codec" },
     { "path": "./packages/waveform" },
+    { "path": "./packages/analysis" },
     { "path": "./apps/desktop" }
   ]
 }

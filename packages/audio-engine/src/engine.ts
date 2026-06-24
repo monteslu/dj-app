@@ -27,6 +27,7 @@ import type { DeckControlIndices, EngineMessage, WorkletMessage } from './protoc
 import type { DecodedTrack } from './decoded-track.js';
 import { CueControl } from './controls/cue-control.js';
 import { LoopControl } from './controls/loop-control.js';
+import { SmartFader } from './sync/smart-fader.js';
 
 export interface EngineOptions {
   bus: ControlBus;
@@ -56,6 +57,7 @@ export class Engine {
   private disconnects: Array<() => void> = [];
   private cueControls: CueControl[] = [];
   private loopControls: LoopControl[] = [];
+  private smartFader: SmartFader | null = null;
 
   constructor(opts: EngineOptions) {
     this.bus = opts.bus;
@@ -104,6 +106,12 @@ export class Engine {
     }
     this.wireMasterParams();
 
+    // Smart Fader (our fork feature, 09): crossfader drives a tempo blend.
+    this.smartFader = new SmartFader({
+      bus: this.bus,
+      setRateRatio: (deckIndex, ratio) => this.setRateRatioOverride(deckIndex, ratio),
+    });
+
     // Initialize the worklet with the control SAB + index maps.
     const sab = this.bus.sab;
     if (!sab) {
@@ -135,6 +143,7 @@ export class Engine {
       rateRange: r(DeckKeys.rateRange),
       rateDirection: r(DeckKeys.rateDirection),
       rateRatio: r(DeckKeys.rateRatio),
+      rateRatioOverride: r(DeckKeys.rateRatioOverride),
       keylock: r(DeckKeys.keylock),
       pregain: r(DeckKeys.pregain),
       volume: r(DeckKeys.volume),
@@ -218,6 +227,16 @@ export class Engine {
     if (frames > 0) {
       this.bus.set(g, DeckKeys.playPosition, frame / frames);
     }
+  }
+
+  /**
+   * Set a deck's direct rate-ratio override (used by sync / smart fader to reach
+   * ratios beyond the slider range). A ratio of exactly 1.0 releases the override
+   * back to slider control.
+   */
+  private setRateRatioOverride(deckIndex: number, ratio: number): void {
+    const g = deckGroup(deckIndex + 1);
+    this.bus.set(g, DeckKeys.rateRatioOverride, ratio === 1 ? 0 : ratio);
   }
 
   /** Install the per-deck EngineControl stack (cue + loop). */
@@ -314,6 +333,8 @@ export class Engine {
     for (const l of this.loopControls) {
       l.dispose();
     }
+    this.smartFader?.dispose();
+    this.smartFader = null;
     this.cueControls = [];
     this.loopControls = [];
     this.disconnects = [];

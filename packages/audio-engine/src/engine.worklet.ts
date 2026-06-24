@@ -146,9 +146,11 @@ class EngineProcessor extends AudioWorkletProcessor {
       const rateDir = sabRead(control, idx.rateDirection) >= 0 ? 1 : -1;
       const pregain = sabRead(control, idx.pregain);
       const keylock = sabRead(control, idx.keylock) > 0.5;
+      const ratioOverride = sabRead(control, idx.rateRatioOverride);
 
       slot.playback.setKeylock(keylock);
-      const speed = calculateSpeed(rate, rateRange, rateDir);
+      // Sync / smart fader can force a rate ratio beyond the slider's range.
+      const speed = ratioOverride > 0 ? ratioOverride : calculateSpeed(rate, rateRange, rateDir);
 
       const stillPlaying = slot.playback.process(out, numFrames, speed, playing);
 

@@ -18,6 +18,7 @@ import {
 } from 'react';
 import { ControlBus, standardControls, type Group, type Key } from '@internal-dj/control-bus';
 import { Engine } from '@internal-dj/audio-engine';
+import { AnalysisService } from './analysis-service.js';
 
 export const NUM_DECKS = 2;
 // 2 decks each carry 36 hotcues × 6 keys + loops + beatloops, so the surface is
@@ -27,6 +28,7 @@ const SAB_CAPACITY = 2048;
 export interface DjRuntime {
   bus: ControlBus;
   engine: Engine;
+  analysis: AnalysisService;
   /** True once the AudioContext has been started (needs a user gesture). */
   started: boolean;
   start: () => Promise<void>;
@@ -34,7 +36,7 @@ export interface DjRuntime {
 
 const DjContext = createContext<DjRuntime | null>(null);
 
-function buildRuntime(): { bus: ControlBus; engine: Engine } {
+function buildRuntime(): { bus: ControlBus; engine: Engine; analysis: AnalysisService } {
   const bus = new ControlBus({
     sab: { capacity: SAB_CAPACITY },
     // M1: persistence is in-memory only (no disk yet). Wire to electron-store later.
@@ -47,7 +49,8 @@ function buildRuntime(): { bus: ControlBus; engine: Engine } {
   const workletUrl = new URL('./worklets/engine.worklet.js', document.baseURI);
 
   const engine = new Engine({ bus, numDecks: NUM_DECKS, workletUrl });
-  return { bus, engine };
+  const analysis = new AnalysisService();
+  return { bus, engine, analysis };
 }
 
 export function DjProvider({ children }: { children: ReactNode }): React.JSX.Element {
@@ -65,11 +68,20 @@ export function DjProvider({ children }: { children: ReactNode }): React.JSX.Ele
   useEffect(() => {
     return () => {
       void runtime.engine.dispose();
+      runtime.analysis.dispose();
     };
   }, [runtime]);
 
   return (
-    <DjContext.Provider value={{ bus: runtime.bus, engine: runtime.engine, started, start }}>
+    <DjContext.Provider
+      value={{
+        bus: runtime.bus,
+        engine: runtime.engine,
+        analysis: runtime.analysis,
+        started,
+        start,
+      }}
+    >
       {children}
     </DjContext.Provider>
   );

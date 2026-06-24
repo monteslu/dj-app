@@ -6,12 +6,15 @@
 
 import { useEffect } from 'react';
 import { MASTER, MasterKeys, deck as deckGroup, DeckKeys } from '@internal-dj/control-bus';
-import { useControl, useDj } from '../dj-context.js';
+import { useControl, useControlValue, useDj } from '../dj-context.js';
 
 export function Mixer(): React.JSX.Element {
   const { bus } = useDj();
   const [xfader, setXfader] = useControl(MASTER, MasterKeys.crossfader);
   const [gain, setGain] = useControl(MASTER, MasterKeys.gain);
+  const [smartFader, setSmartFader] = useControl(MASTER, MasterKeys.smartFaderEnabled);
+  const sfTargetBpm = useControlValue(MASTER, MasterKeys.smartFaderTargetBpm);
+  const sfActive = useControlValue(MASTER, MasterKeys.smartFaderActive) > 0.5;
 
   // Orient deck 1 left, deck 2 right so the crossfader blends them.
   useEffect(() => {
@@ -51,6 +54,19 @@ export function Mixer(): React.JSX.Element {
         <button className="tiny" onClick={() => setXfader(0)} title="center crossfader">
           ◇
         </button>
+      </div>
+
+      <div className="mixer-smartfader">
+        <button
+          className={`smartfader-btn ${smartFader > 0.5 ? 'active' : ''}`}
+          onClick={() => setSmartFader(smartFader > 0.5 ? 0 : 1)}
+          title="Smart Fader: crossfader blends the two decks' tempo (load both decks first)"
+        >
+          SMART FADER
+        </button>
+        {sfActive && sfTargetBpm > 0 && (
+          <span className="smartfader-bpm">{sfTargetBpm.toFixed(1)} BPM</span>
+        )}
       </div>
     </section>
   );

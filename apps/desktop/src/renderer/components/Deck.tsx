@@ -23,7 +23,7 @@ interface Props {
 }
 
 export function Deck({ deckIndex }: Props): React.JSX.Element {
-  const { engine, bus, started, start } = useDj();
+  const { engine, bus, analysis, started, start } = useDj();
   const grp = deckGroup(deckIndex + 1);
 
   const [play, setPlay] = useControl(grp, DeckKeys.play);
@@ -65,11 +65,19 @@ export function Deck({ deckIndex }: Props): React.JSX.Element {
 
         engine.loadTrack(deckIndex, track);
         setTrackName(file.name);
+
+        // Analyze BPM/beatgrid off-thread; set file_bpm when done (drives
+        // beatloops, sync, smart fader).
+        void analysis.analyze(track).then((r) => {
+          if (r.bpm > 0) {
+            bus.set(grp, DeckKeys.fileBpm, r.bpm);
+          }
+        });
       } finally {
         setLoading(false);
       }
     },
-    [engine, started, start, deckIndex],
+    [engine, bus, analysis, grp, started, start, deckIndex],
   );
 
   const onLoadClick = useCallback(async () => {

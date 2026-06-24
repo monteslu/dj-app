@@ -97,6 +97,9 @@ export const DeckKeys = {
   rateRange: 'rateRange', // e.g. 0.10 == ±10%
   rateDirection: 'rate_dir', // +1 or -1
   rateRatio: 'rate_ratio', // effective rate ratio (1.0 == original)
+  // Direct rate-ratio override used by sync / smart fader (which need ratios
+  // beyond the slider's ±range). 0 = inactive (use the slider); >0 = force ratio.
+  rateRatioOverride: 'rate_ratio_override',
   bpm: 'bpm', // effective BPM at current rate
   fileBpm: 'file_bpm', // analyzed/original BPM (used by sync + smart fader)
   keylock: 'keylock',

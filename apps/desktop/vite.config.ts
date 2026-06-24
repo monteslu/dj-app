@@ -12,10 +12,15 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
+      // More-specific subpaths first.
+      '@internal-dj/analysis/worker': fileURLToPath(
+        new URL('../../packages/analysis/src/analysis.worker.ts', import.meta.url),
+      ),
       '@internal-dj/control-bus': pkg('control-bus'),
       '@internal-dj/audio-engine': pkg('audio-engine'),
       '@internal-dj/codec': pkg('codec'),
       '@internal-dj/waveform': pkg('waveform'),
+      '@internal-dj/analysis': pkg('analysis'),
     },
   },
   build: {
