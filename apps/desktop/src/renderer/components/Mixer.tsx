@@ -7,11 +7,13 @@
 import { useEffect } from 'react';
 import { MASTER, MasterKeys, deck as deckGroup, DeckKeys } from '@internal-dj/control-bus';
 import { useControl, useControlValue, useDj } from '../dj-context.js';
+import { Knob } from './Knob.js';
+import { GainFader } from './Faders.js';
+import { VuMeterBar } from './VuMeterBar.js';
 
 export function Mixer(): React.JSX.Element {
   const { bus } = useDj();
   const [xfader, setXfader] = useControl(MASTER, MasterKeys.crossfader);
-  const [gain, setGain] = useControl(MASTER, MasterKeys.gain);
   const [smartFader, setSmartFader] = useControl(MASTER, MasterKeys.smartFaderEnabled);
   const sfTargetBpm = useControlValue(MASTER, MasterKeys.smartFaderTargetBpm);
   const sfActive = useControlValue(MASTER, MasterKeys.smartFaderActive) > 0.5;
@@ -24,19 +26,16 @@ export function Mixer(): React.JSX.Element {
 
   return (
     <section className="mixer" aria-label="Mixer">
-      <div className="mixer-title">MASTER</div>
       <div className="mixer-master">
-        <input
-          type="range"
-          min={0}
-          max={5}
-          step={0.01}
-          value={gain}
-          onChange={(e) => setGain(Number(e.target.value))}
-          className="master-gain"
-          aria-label="Master gain"
-        />
-        <label>{gain.toFixed(1)}</label>
+        <Knob group={MASTER} ckey={MasterKeys.gain} label="MAIN" min={0} max={5} center={1} big />
+      </div>
+
+      {/* channel gain faders, above the crossfader (per Luis) */}
+      <div className="mixer-gains">
+        <GainFader deckIndex={0} />
+        <VuMeterBar deckIndex={0} />
+        <VuMeterBar deckIndex={1} />
+        <GainFader deckIndex={1} />
       </div>
 
       <div className="mixer-xfader">
@@ -49,26 +48,19 @@ export function Mixer(): React.JSX.Element {
           value={xfader}
           onChange={(e) => setXfader(Number(e.target.value))}
           className="xfader-slider"
+          onDoubleClick={() => setXfader(0)}
           aria-label="Crossfader"
         />
         <span className="xfader-end b">B</span>
-        <button className="tiny" onClick={() => setXfader(0)} title="center crossfader">
-          ◇
-        </button>
       </div>
 
-      <div className="mixer-smartfader">
-        <button
-          className={`smartfader-btn ${smartFader > 0.5 ? 'active' : ''}`}
-          onClick={() => setSmartFader(smartFader > 0.5 ? 0 : 1)}
-          title="Smart Fader: crossfader blends the two decks' tempo (load both decks first)"
-        >
-          SMART FADER
-        </button>
-        {sfActive && sfTargetBpm > 0 && (
-          <span className="smartfader-bpm">{sfTargetBpm.toFixed(1)} BPM</span>
-        )}
-      </div>
+      <button
+        className={`smartfader-btn ${smartFader > 0.5 ? 'active' : ''}`}
+        onClick={() => setSmartFader(smartFader > 0.5 ? 0 : 1)}
+        title="Smart Fader: crossfader blends the two decks' tempo"
+      >
+        SMART{sfActive && sfTargetBpm > 0 ? ` ${sfTargetBpm.toFixed(0)}` : ''}
+      </button>
     </section>
   );
 }

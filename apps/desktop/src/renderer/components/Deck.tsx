@@ -17,7 +17,6 @@ import { WaveformView } from './WaveformView.js';
 import { Knob } from './Knob.js';
 import { HotcueRow } from './HotcueRow.js';
 import { LoopRow } from './LoopRow.js';
-import { VuMeterBar } from './VuMeterBar.js';
 import { QuickEffect } from './QuickEffect.js';
 
 interface Props {
@@ -30,7 +29,6 @@ export function Deck({ deckIndex, side = 'left' }: Props): React.JSX.Element {
   const grp = deckGroup(deckIndex + 1);
 
   const [play, setPlay] = useControl(grp, DeckKeys.play);
-  const [rate, setRate] = useControl(grp, DeckKeys.rate);
   const [keylock, setKeylock] = useControl(grp, DeckKeys.keylock);
   const [pfl, setPfl] = useControl(grp, DeckKeys.pfl);
   const trackLoaded = useControlValue(grp, DeckKeys.trackLoaded);
@@ -168,7 +166,7 @@ export function Deck({ deckIndex, side = 'left' }: Props): React.JSX.Element {
 
   return (
     <section
-      className="deck"
+      className={`deck ${side}`}
       onDragOver={(e) => e.preventDefault()}
       onDrop={onDrop}
       aria-label={`Deck ${deckIndex + 1}`}
@@ -225,48 +223,21 @@ export function Deck({ deckIndex, side = 'left' }: Props): React.JSX.Element {
         <Knob group={grp} ckey={DeckKeys.eqMid} label="MID" min={0} max={4} center={1} />
         <Knob group={grp} ckey={DeckKeys.eqLow} label="LOW" min={0} max={4} center={1} />
         <QuickEffect deckIndex={deckIndex} />
-      </div>
-
-      <div className="deck-tempo">
-        <button
-          className="tiny bend"
-          onPointerDown={() => startBend(-1)}
-          title="pitch bend down (hold)"
-        >
-          ‹
-        </button>
-        <input
-          type="range"
-          min={-1}
-          max={1}
-          step={0.001}
-          value={rate}
-          onChange={(e) => setRate(Number(e.target.value))}
-          className="tempo-slider"
-          aria-label={`Deck ${deckIndex + 1} tempo`}
-        />
-        <button
-          className="tiny bend"
-          onPointerDown={() => startBend(1)}
-          title="pitch bend up (hold)"
-        >
-          ›
-        </button>
-        <button className="tiny" onClick={() => setRate(0)} title="reset tempo">
-          0
-        </button>
-        <button
-          className={`tiny ${keylock > 0.5 ? 'active' : ''}`}
-          onClick={() => setKeylock(keylock > 0.5 ? 0 : 1)}
-          title="keylock (master tempo): change speed without changing pitch"
-        >
-          🔒
-        </button>
-      </div>
-
-      <div className="deck-volume">
-        <Knob group={grp} ckey={DeckKeys.volume} label="VOL" min={0} max={1} center={1} />
-        <VuMeterBar deckIndex={deckIndex} />
+        <div className="deck-extras">
+          <button
+            className={`tiny ${keylock > 0.5 ? 'active' : ''}`}
+            onClick={() => setKeylock(keylock > 0.5 ? 0 : 1)}
+            title="keylock (master tempo)"
+          >
+            🔒
+          </button>
+          <button className="tiny bend" onPointerDown={() => startBend(-1)} title="pitch bend down">
+            ‹
+          </button>
+          <button className="tiny bend" onPointerDown={() => startBend(1)} title="pitch bend up">
+            ›
+          </button>
+        </div>
       </div>
 
       {/* silence unused import warning while bus is reserved for future direct reads */}

@@ -10,6 +10,7 @@ import { Deck } from './components/Deck.js';
 import { Mixer } from './components/Mixer.js';
 import { Library } from './components/Library.js';
 import { AudioSettings } from './components/AudioSettings.js';
+import { TempoFader } from './components/Faders.js';
 import { isDemo, seedDemo } from './demo.js';
 
 function RecordButton(): React.JSX.Element {
@@ -76,9 +77,11 @@ function Stage(): React.JSX.Element {
       </div>
       {showAudio && <AudioSettings onClose={() => setShowAudio(false)} />}
       <main className="console">
+        <TempoFader deckIndex={0} side="left" />
         <Deck deckIndex={0} side="left" />
         <Mixer />
         <Deck deckIndex={1} side="right" />
+        <TempoFader deckIndex={1} side="right" />
       </main>
       <Library />
       <footer className="statusbar">

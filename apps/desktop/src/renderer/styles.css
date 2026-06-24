@@ -45,7 +45,7 @@ body,
 
 .app {
   display: grid;
-  grid-template-rows: auto minmax(0, 1.1fr) minmax(0, 0.9fr) auto;
+  grid-template-rows: auto minmax(0, 1fr) minmax(0, 1.15fr) auto;
   grid-template-areas: 'top' 'console' 'library' 'status';
   height: 100%;
   background:
@@ -109,11 +109,41 @@ body,
 .console {
   grid-area: console;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(120px, 11vw, 190px) minmax(0, 1fr);
-  gap: 10px;
-  padding: 10px 12px;
+  grid-template-columns:
+    52px minmax(0, 1fr) clamp(140px, 12vw, 210px) minmax(0, 1fr) 52px;
+  gap: 9px;
+  padding: 9px 11px;
   min-height: 0;
   overflow: hidden;
+}
+
+/* tempo faders on the OUTER edges of the deck row */
+.tempo-fader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  background: linear-gradient(180deg, var(--panel), var(--bg-2));
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  padding: 8px 4px;
+  min-height: 0;
+  box-shadow: var(--shadow);
+}
+.fader-cap {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--text-faint);
+}
+.fader-val {
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+}
+.tempo-fader .vfader {
+  flex: 1;
+  min-height: 0;
 }
 
 /* ── deck ─────────────────────────────────────────────────── */
@@ -324,16 +354,35 @@ body,
   align-items: center;
   gap: 3px;
 }
+.knob-rim {
+  fill: #0c0f15;
+  stroke: var(--edge);
+  stroke-width: 1;
+}
 .knob-body {
   fill: url(#knobgrad);
   stroke: var(--edge-bright);
-  stroke-width: 2;
+  stroke-width: 1;
 }
-.knob-indicator {
+.knob-track {
+  stroke: #2a3242;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+.knob-arc {
   stroke: var(--accent);
   stroke-width: 3;
   stroke-linecap: round;
   filter: drop-shadow(0 0 3px var(--accent-glow));
+}
+.knob-indicator {
+  stroke: #eaf4ff;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+.knob-big .knob-arc {
+  stroke: var(--cue);
+  filter: drop-shadow(0 0 4px rgba(255, 180, 61, 0.5));
 }
 .knob-label {
   font-size: 10px;
@@ -430,29 +479,53 @@ body,
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+}
+.master-val {
   font-size: 11px;
   font-variant-numeric: tabular-nums;
   color: var(--text-dim);
+}
+/* channel gain faders + VU meters, above the crossfader */
+.mixer-gains {
   flex: 1;
   min-height: 0;
-  max-height: 320px;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 4px;
+  width: 100%;
+  align-items: stretch;
+  justify-items: center;
+  padding: 4px 0;
 }
-.master-gain {
-  writing-mode: vertical-lr;
-  direction: rtl;
-  flex: 1;
-  accent-color: var(--accent);
+.gain-fader {
+  display: flex;
+  justify-content: center;
+  min-height: 0;
+}
+.gain-fader .vfader {
+  height: 100%;
+}
+.gain-fader.deck-a .vfader::-webkit-slider-thumb {
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.6),
+    0 0 8px rgba(56, 182, 255, 0.4);
+}
+.gain-fader.deck-b .vfader::-webkit-slider-thumb {
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.6),
+    0 0 8px rgba(255, 122, 61, 0.4);
+}
+.mixer-gains .vu-meter {
+  height: 100%;
 }
 .mixer-xfader {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   width: 100%;
 }
 .xfader-slider {
   flex: 1;
-  accent-color: var(--text);
 }
 .xfader-end {
   font-size: 13px;
@@ -464,18 +537,11 @@ body,
 .xfader-end.b {
   color: var(--deck-b);
 }
-.mixer-smartfader {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  width: 100%;
-}
 .smartfader-btn {
   width: 100%;
   font-size: 10px;
   letter-spacing: 0.5px;
-  padding: 8px 6px;
+  padding: 6px;
   white-space: nowrap;
   font-weight: 700;
 }
@@ -483,13 +549,13 @@ body,
   background: linear-gradient(180deg, #ff9a4d, #ff5a5a);
   color: #2a0f02;
   border-color: var(--cue);
-  box-shadow: 0 0 14px rgba(255, 122, 61, 0.45);
+  box-shadow: 0 0 12px rgba(255, 122, 61, 0.45);
 }
-.smartfader-bpm {
-  font-size: 12px;
-  color: var(--cue);
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
+.deck-extras {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-left: auto;
 }
 
 /* ── library ──────────────────────────────────────────────── */
@@ -647,8 +713,63 @@ button.tiny {
   padding: 5px 10px;
   font-size: 11px;
 }
+/* ── sliders (custom, since native range looks broken in Electron) ───── */
 input[type='range'] {
-  accent-color: var(--accent);
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  height: 22px;
+}
+input[type='range']::-webkit-slider-runnable-track {
+  height: 5px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #2a3242, #1a2030);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #eaf4ff, var(--accent) 70%);
+  border: 1px solid #0a3a55;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.6),
+    0 0 8px var(--accent-glow);
+}
+input[type='range']:hover::-webkit-slider-thumb {
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.6),
+    0 0 14px var(--accent-glow);
+}
+
+/* vertical sliders (tempo / gain / master) — fader style */
+input[type='range'].vfader {
+  writing-mode: vertical-lr;
+  direction: rtl;
+  width: 22px;
+  height: 100%;
+}
+input[type='range'].vfader::-webkit-slider-runnable-track {
+  width: 6px;
+  height: auto;
+  background: linear-gradient(180deg, #2a3242, #14192400);
+}
+input[type='range'].vfader::-webkit-slider-thumb {
+  width: 26px;
+  height: 14px;
+  margin-top: 0;
+  margin-left: -10px;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #404a5e, #222a39);
+  border: 1px solid var(--edge-bright);
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -6px 0 -4px rgba(0, 0, 0, 0.5);
 }
 
 /* ── modal (audio routing) ────────────────────────────────── */
