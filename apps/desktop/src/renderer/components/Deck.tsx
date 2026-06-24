@@ -18,6 +18,7 @@ import { Knob } from './Knob.js';
 import { HotcueRow } from './HotcueRow.js';
 import { LoopRow } from './LoopRow.js';
 import { VuMeterBar } from './VuMeterBar.js';
+import { QuickEffect } from './QuickEffect.js';
 
 interface Props {
   deckIndex: number; // 0-based
@@ -193,6 +194,7 @@ export function Deck({ deckIndex }: Props): React.JSX.Element {
         <Knob group={grp} ckey={DeckKeys.eqHigh} label="HI" min={0} max={4} center={1} />
         <Knob group={grp} ckey={DeckKeys.eqMid} label="MID" min={0} max={4} center={1} />
         <Knob group={grp} ckey={DeckKeys.eqLow} label="LOW" min={0} max={4} center={1} />
+        <QuickEffect deckIndex={deckIndex} />
       </div>
 
       <div className="deck-tempo">

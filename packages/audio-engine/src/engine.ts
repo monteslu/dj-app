@@ -28,6 +28,7 @@ import type { DecodedTrack } from './decoded-track.js';
 import { CueControl } from './controls/cue-control.js';
 import { LoopControl } from './controls/loop-control.js';
 import { SmartFader } from './sync/smart-fader.js';
+import { EffectUnit } from './effects/effect-unit.js';
 
 export interface EngineOptions {
   bus: ControlBus;
@@ -58,6 +59,7 @@ export class Engine {
   private cueControls: CueControl[] = [];
   private loopControls: LoopControl[] = [];
   private smartFader: SmartFader | null = null;
+  private quickEffects: EffectUnit[] = [];
 
   constructor(opts: EngineOptions) {
     this.bus = opts.bus;
@@ -103,6 +105,7 @@ export class Engine {
       deckIndices.push(this.deckIndexMap(d));
       this.wireDeckParams(d, g);
       this.installDeckControls(d, ctx.sampleRate);
+      this.installQuickEffect(d, ctx, deckGroup(d + 1));
     }
     this.wireMasterParams();
 
@@ -241,6 +244,42 @@ export class Engine {
     this.bus.set(g, DeckKeys.rateRatioOverride, ratio === 1 ? 0 : ratio);
   }
 
+  /**
+   * Install the per-deck QuickEffect (default Filter). The unit sits between the
+   * EQ and the volume fader; when enabled it's spliced into the graph and the
+   * super knob drives its metaknob (the Filter trick: one knob = LPF↔HPF).
+   */
+  private installQuickEffect(d: number, ctx: AudioContext, g: string): void {
+    const graph = this.deckGraphs[d]!;
+    const unit = new EffectUnit(ctx);
+    unit.loadEffect(0, 'filter');
+    unit.setMix(1); // QuickEffect is fully wet (it's an insert)
+    this.quickEffects[d] = unit;
+
+    const setEnabled = (on: boolean) => {
+      try {
+        graph.quickFxIn.disconnect();
+      } catch {
+        /* not connected */
+      }
+      if (on) {
+        graph.quickFxIn.connect(unit.input);
+        unit.output.connect(graph.volume);
+      } else {
+        graph.quickFxIn.connect(graph.volume); // bypass
+      }
+    };
+
+    // Initial state from the (persisted) controls.
+    unit.setMeta(this.bus.get(g, DeckKeys.quickEffectSuper));
+    setEnabled(this.bus.get(g, DeckKeys.quickEffectEnabled) > 0.5);
+
+    this.disconnects.push(
+      this.bus.connect(g, DeckKeys.quickEffectSuper, (v) => unit.setMeta(v)),
+      this.bus.connect(g, DeckKeys.quickEffectEnabled, (v) => setEnabled(v > 0.5)),
+    );
+  }
+
   /** Install the per-deck EngineControl stack (cue + loop). */
   private installDeckControls(d: number, sampleRate: number): void {
     const g = deckGroup(d + 1);
@@ -337,6 +376,10 @@ export class Engine {
     }
     this.smartFader?.dispose();
     this.smartFader = null;
+    for (const fx of this.quickEffects) {
+      fx.dispose();
+    }
+    this.quickEffects = [];
     this.cueControls = [];
     this.loopControls = [];
     this.disconnects = [];

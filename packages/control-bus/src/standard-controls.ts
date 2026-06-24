@@ -72,6 +72,10 @@ function deckControls(g: string): ControlDef[] {
     { group: g, key: DeckKeys.vuMeterR, default: 0 },
     { group: g, key: DeckKeys.peakIndicator, default: 0 },
 
+    // QuickEffect (default Filter): super knob 0..1 (0.5 = neutral), enable toggle.
+    { group: g, key: DeckKeys.quickEffectSuper, default: 0.5, persist: true },
+    { group: g, key: DeckKeys.quickEffectEnabled, default: 0, persist: true },
+
     // main cue (persisted with the track later; in-memory for now)
     { group: g, key: DeckKeys.cuePoint, default: -1 },
     { group: g, key: DeckKeys.cueSet, default: 0 },

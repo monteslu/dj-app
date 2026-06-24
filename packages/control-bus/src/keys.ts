@@ -123,6 +123,12 @@ export const DeckKeys = {
   vuMeterR: 'vu_meter_right',
   peakIndicator: 'peak_indicator',
 
+  // QuickEffect (per-deck single-knob effect, default Filter). The super knob is
+  // exposed as the Mixxx-compatible quickEffectSuperKnob name via the QuickEffect
+  // rack group, but we also surface a deck-local convenience here.
+  quickEffectSuper: 'quickeffect_super1',
+  quickEffectEnabled: 'quickeffect_enabled',
+
   // main cue (Mixxx names)
   cuePoint: 'cue_point', // frames; -1 = unset
   cueSet: 'cue_set',

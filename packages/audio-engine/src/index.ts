@@ -20,6 +20,18 @@ export {
 } from './sync/sync-engine.js';
 export { SmartFader, type SmartFaderDeps } from './sync/smart-fader.js';
 export { sliderFromRateRatio } from './rate.js';
+export { EffectUnit } from './effects/effect-unit.js';
+export { BUILTIN_EFFECTS, getEffect } from './effects/builtin-effects.js';
+export { metaknobToParam } from './effects/metaknob.js';
+export {
+  denormalize,
+  normalize,
+  type EffectManifest,
+  type EffectParamManifest,
+  type EffectInstance,
+  type RegisteredEffect,
+  type LinkType,
+} from './effects/effect-types.js';
 export { calculateSpeed, rateRatioFromSlider } from './rate.js';
 export { VuMeter } from './vu-meter.js';
 export {

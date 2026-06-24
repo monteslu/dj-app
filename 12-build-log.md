@@ -322,6 +322,33 @@ surgery).
 - PFL/headphone cue DEFERRED — needs the multi-output-device work (the documented M3 friction, 10 §4a).
   Low value solo (you hear the main mix); revisit if a real 2-output setup matters.
 
+## JS HEAVY-LIFTING DEBT LEDGER (the "zero heavy lifting in JS" rule, 10 §0)
+
+Honest accounting of per-sample JS loops currently in the audio path that VIOLATE the core rule, with
+the conversion plan. The rule: DSP/codec/ML runs in WASM(SIMD/threads) or WebGPU, never plain JS. I
+wrote JS-loop versions first to get the architecture working (MVP velocity); these are DEBT to convert,
+not the final state. Mixxx's own C/C++ for each is the source to Emscripten-compile.
+
+| Loop | File | When | Severity | Plan |
+|------|------|------|----------|------|
+| Linear-interp resampler | `deck-playback.ts pullResampled` | real-time, every block/deck | **HIGH** | The core sample reader. Convert to a WASM-SIMD module (compile a small C resampler, or lift Mixxx's EngineBufferScaleLinear). This is THE hot path. |
+| Pregain multiply | `engine.worklet.ts` | real-time | LOW | Trivial; fold into the WASM resampler output, or use a GainNode (it's already going to a GainNode-based strip — can drop the worklet pregain entirely). |
+| Interleave/deinterleave for SoundTouch | `keylock-scaler.ts` | real-time when keylock on | MED | Goes away when we swap soundtouchjs (JS port) for SoundTouch/RubberBand compiled to WASM, which can take planar or do the interleave in C. |
+| VU mean-of-abs | `vu-meter.ts` | real-time, cheap | LOW | Small; convert with the resampler WASM or leave (a few hundred abs/adds per block). |
+| Onset envelope + autocorrelation | `beat-detector.ts` | OFFLINE (worker, once/track) | MED | Not real-time, but still JS heavy lifting. Convert to WASM-SIMD (or swap for essentia.js/qm-dsp-WASM, the documented M5 plan). |
+
+**Decision for M8 (effects): use NATIVE Web Audio nodes wherever possible.** A `BiquadFilterNode`,
+`DelayNode`, `ConvolverNode`, `WaveShaperNode` runs its DSP in the browser's optimized C++, NOT in JS —
+so it satisfies the rule for free. Only effects with no native equivalent become AudioWorklet+WASM. We
+do NOT write per-sample JS DSP loops for effects. The metaknob/routing LOGIC (sparse, event-driven, not
+per-sample) staying in JS is fine — that's orchestration, not heavy lifting.
+
+**Conversion is tracked, not forgotten.** The JS-loop hot paths above get WASM-SIMD replacements behind
+the existing interfaces (Scaler, the worklet) — the interfaces were designed so the impl swaps without
+touching callers. Priority order: deck-playback resampler (HIGH) → keylock WASM → beat-detector → VU.
+
+---
+
 ## Session 1 (cont) — M7 foundation: the controller host (the strategic linchpin)
 
 The bet: implement Mixxx's `engine` global API faithfully and stock Mixxx mappings run UNCHANGED. New
@@ -344,10 +371,36 @@ subtree, Web MIDI input routing, and the .midi.xml parser are the remaining M7 a
 20 controller-host tests. softTakeover is a deliberate no-op stub (mappings call it freely; value-jump
 prevention is a TODO that doesn't block correctness).
 
+## Session 1 (cont) — M8: effects (native Web Audio, zero-JS-DSP)
+
+Built per the "zero heavy lifting in JS" rule (Luis re-flagged it; see the DEBT LEDGER above). The whole
+point of M8's design: effects are NATIVE Web Audio nodes (BiquadFilter/Delay/Convolver/WaveShaper) whose
+DSP runs in the browser's optimized C++, NOT in JS — so they satisfy the rule for free. No per-sample JS
+DSP loops were written for effects.
+
+`packages/audio-engine/src/effects/`:
+- `effect-types.ts` — EffectManifest/EffectInstance/LinkType + denormalize/normalize (log scale for freq).
+- `metaknob.ts` — the metaknob link math (Mixxx EffectKnobParameterSlot). Pure, sparse, event-driven JS
+  (knob moves, not per-sample) = fine. The Filter trick (LPF=linkedLeft neutral-open, HPF=linkedRight
+  neutral-open) is TESTED: one knob sweeps lowpass → neutral → highpass.
+- `builtin-effects.ts` — Filter (LPF+HPF biquads), Echo (Delay+feedback), Reverb (Convolver +
+  synthesized impulse), Distortion (WaveShaper), Bitcrusher (WaveShaper amplitude-quantize). All native.
+- `effect-unit.ts` — EffectUnit: a 3-slot chain + wet/dry mix + metaknob fan-out, built from native
+  nodes (input→dry/wet split→[fx chain]→equal-power mix→output).
+
+Wired the **QuickEffect** (the per-deck filter super-knob, Mixxx's most-used effect) into each deck:
+spliced between EQ and volume, super knob → metaknob, enable toggle bypasses it. quickFxIn insertion
+point added to the deck graph. UI: a FILTER knob + enable dot per deck. quickeffect_super1/enabled
+controls (persisted).
+
+11 effects tests (metaknob Filter trick, log/linear denormalize, registry). True sample-rate-reduction
+bitcrush + tempo-synced time effects (Echo beat-sync) would need a worklet later; bit-depth crush +
+fixed-time echo are well-approximated natively now.
+
 ### Where we are after session 1
-M1 (first light) · M2 (keylock) · M3 (mixer: EQ/xfader/VU/pitch-bend) · M4 (cues/loops) ·
-M5 (analysis/sync/smartfader) COMPLETE; M7 controller-host FOUNDATION done (engine API proven).
-7 packages + the Electron app, **101 tests**, boots cross-origin-isolated with WebGPU. Remaining: M6
-(library/SQLite), M7 app-level (Web MIDI routing + vendored Mixxx mappings + XML parse), M8 (effects),
-M9 (record/broadcast/stems), + PFL cue + softTakeover. Everything pending a human ear/eye test on real
-hardware (no display + no Electron binary in this env).
+M1 (first light) · M2 (keylock) · M3 (mixer) · M4 (cues/loops) · M5 (analysis/sync/smartfader) ·
+M8 (effects: QuickEffect filter + framework) COMPLETE; M7 controller-host FOUNDATION done.
+7 packages + the Electron app, **112 tests**, boots cross-origin-isolated with WebGPU. Remaining: M6
+(library/SQLite), M7 app-level (Web MIDI + vendored Mixxx mappings + XML parse), full effect units
+(routable to any channel), M9 (record/broadcast/stems), + PFL cue + softTakeover + the JS→WASM debt
+conversions (ledger above). Everything pending a human ear/eye test on real hardware.

@@ -17,6 +17,8 @@ export interface DeckGraphNodes {
   volume: GainNode;
   /** Crossfader contribution gain (driven by crossfader position + orientation). */
   crossfader: GainNode;
+  /** QuickEffect insertion point (between EQ and volume). */
+  quickFxIn: GainNode;
   /** The node to connect the worklet output into. */
   input: AudioNode;
   /** The node that feeds the master sum. */
@@ -35,11 +37,15 @@ export function createDeckGraph(ctx: BaseAudioContext): DeckGraphNodes {
   const eqHigh = new BiquadFilterNode(ctx, { type: 'highshelf', frequency: 2500, gain: 0 });
   const volume = new GainNode(ctx, { gain: 1 });
   const crossfader = new GainNode(ctx, { gain: 1 });
+  // QuickEffect insertion point: a pass-through gain between EQ and volume. An
+  // EffectUnit is spliced in here (eqHigh → quickFxIn → [unit] → volume).
+  const quickFxIn = new GainNode(ctx, { gain: 1 });
 
-  // Chain: input → eqLow → eqMid → eqHigh → volume → crossfader → output
+  // Chain: input → eqLow → eqMid → eqHigh → quickFxIn → volume → crossfader → output
   eqLow.connect(eqMid);
   eqMid.connect(eqHigh);
-  eqHigh.connect(volume);
+  eqHigh.connect(quickFxIn);
+  quickFxIn.connect(volume); // default: no effect (direct)
   volume.connect(crossfader);
 
   return {
@@ -48,6 +54,7 @@ export function createDeckGraph(ctx: BaseAudioContext): DeckGraphNodes {
     eqHigh,
     volume,
     crossfader,
+    quickFxIn,
     input: eqLow,
     output: crossfader,
   };
