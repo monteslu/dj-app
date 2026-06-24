@@ -18,6 +18,7 @@
 
 import type { Scaler, SourcePull } from './scaler.js';
 import { KeylockScaler } from './keylock-scaler.js';
+import { WasmResampler } from '@internal-dj/dsp-wasm';
 
 export interface DeckTrack {
   /** Planar Float32 channel data. channelData[c][frame]. */
@@ -37,6 +38,9 @@ export class DeckPlayback {
   private keylock = false;
   private keylockScaler: Scaler | null = null;
 
+  /** The WASM+SIMD resampler — the real-time read path (replaces the JS loop). */
+  private readonly wasm = new WasmResampler();
+
   // Loop state (in source frames). When enabled and playing forward, the read
   // position wraps from loopEnd back to loopStart with a short seam crossfade.
   private loopEnabled = false;
@@ -51,12 +55,17 @@ export class DeckPlayback {
     this.track = track;
     this.position = 0;
     this.baseRate = track.sampleRate / this.engineSampleRate;
+    // Upload planar stereo into the WASM heap (mono → duplicate to both channels).
+    const left = track.channelData[0]!;
+    const right = track.channels > 1 ? track.channelData[1]! : left;
+    this.wasm.setSource(left, right, track.frames);
     this.keylockScaler?.reset();
   }
 
   eject(): void {
     this.track = null;
     this.position = 0;
+    this.wasm.clearSource();
     this.keylockScaler?.reset();
   }
 
@@ -131,30 +140,6 @@ export class DeckPlayback {
   }
 
   /**
-   * Read one interpolated source frame into the planar outputs at column `i`.
-   * Centralizes the sample fetch so the loop seam crossfade can mix two reads.
-   */
-  private readFrameInto(outputs: Float32Array[], i: number, pos: number, gain = 1): void {
-    const track = this.track!;
-    const { channelData, channels, frames } = track;
-    const i0 = Math.floor(pos);
-    const frac = pos - i0;
-    const i1 = i0 + 1 < frames ? i0 + 1 : i0;
-    for (let c = 0; c < outputs.length; c++) {
-      const srcCh = c < channels ? c : channels - 1;
-      const data = channelData[srcCh]!;
-      const s0 = data[i0]!;
-      const s1 = data[i1]!;
-      const sample = s0 + (s1 - s0) * frac;
-      if (gain === 1) {
-        outputs[c]![i] = sample;
-      } else {
-        outputs[c]![i]! += sample * gain;
-      }
-    }
-  }
-
-  /**
    * Linear-interpolation read of `numFrames` from the source into planar
    * `outputs`, advancing the play position by `resampleRatio` source frames per
    * output frame. Returns frames actually produced (fewer at end-of-track). This
@@ -165,54 +150,27 @@ export class DeckPlayback {
     numFrames: number,
     resampleRatio: number,
   ): number {
-    const track = this.track;
-    if (!track) {
+    if (!this.track) {
       return 0;
     }
-    const { frames } = track;
-    const outChannels = outputs.length;
-    let produced = 0;
-    const fade = DeckPlayback.SEAM_FADE;
-
-    for (let i = 0; i < numFrames; i++) {
-      let pos = this.position;
-
-      // Loop wrap: if we've reached/passed loopEnd, jump back to loopStart. We
-      // keep the fractional overshoot so pitch/phase stays continuous.
-      if (this.loopEnabled && resampleRatio > 0 && pos >= this.loopEnd) {
-        pos = this.loopStart + (pos - this.loopEnd);
-        this.position = pos;
-      }
-
-      if (pos < 0 || pos >= frames) {
-        this.position = pos < 0 ? 0 : frames;
-        break;
-      }
-
-      // Base read.
-      this.readFrameInto(outputs, i, pos, 1);
-
-      // Seam crossfade: within `fade` frames before loopEnd, blend in the
-      // corresponding frame just past loopStart so the wrap is click-free.
-      if (this.loopEnabled && resampleRatio > 0) {
-        const distToEnd = this.loopEnd - pos;
-        if (distToEnd > 0 && distToEnd < fade) {
-          const t = distToEnd / fade; // 1 → far from seam, 0 → at seam
-          // fade current out, fade the wrapped-in frame in
-          const wrapPos = this.loopStart + (fade - distToEnd);
-          if (wrapPos < frames) {
-            for (let c = 0; c < outChannels; c++) {
-              outputs[c]![i]! *= t;
-            }
-            this.readFrameInto(outputs, i, wrapPos, 1 - t);
-          }
-        }
-      }
-
-      this.position = pos + resampleRatio;
-      produced++;
+    // Delegate to the WASM+SIMD resampler (the real-time read path). It handles
+    // interpolation + loop wrap + seam crossfade in C; we just hand it state.
+    const outL = outputs[0]!;
+    const outR = outputs[1] ?? outputs[0]!;
+    const res = this.wasm.pull(outL, outR, numFrames, {
+      position: this.position,
+      ratio: resampleRatio,
+      loopEnabled: this.loopEnabled,
+      loopStart: this.loopStart,
+      loopEnd: this.loopEnd,
+      seamFade: DeckPlayback.SEAM_FADE,
+    });
+    this.position = res.newPosition;
+    // Fan a mono-as-stereo output to any further channels (rare; ≤2 here).
+    for (let c = 2; c < outputs.length; c++) {
+      outputs[c]!.set(outL.subarray(0, numFrames));
     }
-    return produced;
+    return res.produced;
   }
 
   /**

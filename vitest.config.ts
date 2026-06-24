@@ -15,6 +15,7 @@ export default defineConfig({
       '@internal-dj/waveform': pkg('waveform'),
       '@internal-dj/analysis': pkg('analysis'),
       '@internal-dj/controller-host': pkg('controller-host'),
+      '@internal-dj/dsp-wasm': pkg('dsp-wasm'),
     },
   },
   test: {

@@ -1,0 +1,17 @@
+{
+  "name": "@internal-dj/dsp-wasm",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "WASM+SIMD DSP modules that replace per-sample JS hot paths (the zero-JS-heavy-lifting rule). Starts with the deck resampler; compiled from csrc/ with emcc. (12-build-log.md DEBT LEDGER)",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "build:wasm": "node scripts/build-wasm.mjs",
+    "test": "vitest run"
+  }
+}

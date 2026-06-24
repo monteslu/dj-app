@@ -331,7 +331,7 @@ not the final state. Mixxx's own C/C++ for each is the source to Emscripten-comp
 
 | Loop | File | When | Severity | Plan |
 |------|------|------|----------|------|
-| Linear-interp resampler | `deck-playback.ts pullResampled` | real-time, every block/deck | **HIGH** | The core sample reader. Convert to a WASM-SIMD module (compile a small C resampler, or lift Mixxx's EngineBufferScaleLinear). This is THE hot path. |
+| ~~Linear-interp resampler~~ | ~~`deck-playback.ts pullResampled`~~ | real-time | ~~**HIGH**~~ | **✅ DONE — converted to WASM+SIMD (`@internal-dj/dsp-wasm`, `csrc/resampler.c` → emcc -O3 -msimd128). Behavior-identical to the JS (5 parity tests). DeckPlayback now delegates the read+loop-wrap+seam-crossfade to WASM.** |
 | Pregain multiply | `engine.worklet.ts` | real-time | LOW | Trivial; fold into the WASM resampler output, or use a GainNode (it's already going to a GainNode-based strip — can drop the worklet pregain entirely). |
 | Interleave/deinterleave for SoundTouch | `keylock-scaler.ts` | real-time when keylock on | MED | Goes away when we swap soundtouchjs (JS port) for SoundTouch/RubberBand compiled to WASM, which can take planar or do the interleave in C. |
 | VU mean-of-abs | `vu-meter.ts` | real-time, cheap | LOW | Small; convert with the resampler WASM or leave (a few hundred abs/adds per block). |
@@ -345,7 +345,16 @@ per-sample) staying in JS is fine — that's orchestration, not heavy lifting.
 
 **Conversion is tracked, not forgotten.** The JS-loop hot paths above get WASM-SIMD replacements behind
 the existing interfaces (Scaler, the worklet) — the interfaces were designed so the impl swaps without
-touching callers. Priority order: deck-playback resampler (HIGH) → keylock WASM → beat-detector → VU.
+touching callers. Priority order: ~~deck-playback resampler (HIGH)~~ ✅ → keylock WASM → beat-detector → VU.
+
+### The WASM toolchain works in this env (emcc 4.0.18 at /home/monteslu/code/mine/emsdk)
+`source /home/monteslu/code/mine/emsdk/emsdk_env.sh` then `emcc`. Also rustc/wasm-pack/clang available.
+`packages/dsp-wasm`: C in `csrc/`, built by `scripts/build-wasm.mjs` (emcc -O3 -msimd128
+--no-entry -s STANDALONE_WASM=1), emitted as **base64-embedded .ts** (`src/generated/`) so the worklet
+instantiates it SYNCHRONOUSLY (`new WebAssembly.Module(bytes)` — allowed in worklet/worker scope for any
+size, unlike the 4KB main-thread limit; ours is 7.6KB). Zero WASM imports → no glue, no fetch. To
+rebuild after editing C: `cd packages/dsp-wasm && source .../emsdk_env.sh && npm run build:wasm`. The
+generated .ts IS committed (so the build works without emcc); regenerate when the C changes.
 
 ---
 
