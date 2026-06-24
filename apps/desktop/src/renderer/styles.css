@@ -56,9 +56,26 @@ body,
   font-style: italic;
 }
 .start-audio {
-  margin-left: auto;
   background: var(--accent-2);
   color: white;
+}
+.record-btn {
+  margin-left: auto;
+}
+.record-btn.recording {
+  background: var(--danger);
+  color: #fff;
+  border-color: var(--danger);
+  animation: rec-pulse 1.2s ease-in-out infinite;
+}
+@keyframes rec-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
 }
 
 /* decks layout */

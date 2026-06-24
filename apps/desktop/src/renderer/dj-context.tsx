@@ -20,6 +20,7 @@ import { ControlBus, standardControls, type Group, type Key } from '@internal-dj
 import { Engine } from '@internal-dj/audio-engine';
 import { AnalysisService } from './analysis-service.js';
 import { ControllerService } from './controller-service.js';
+import { RecordingService } from './recording-service.js';
 
 export const NUM_DECKS = 2;
 // 2 decks each carry 36 hotcues × 6 keys + loops + beatloops, so the surface is
@@ -31,6 +32,7 @@ export interface DjRuntime {
   engine: Engine;
   analysis: AnalysisService;
   controllers: ControllerService;
+  recording: RecordingService;
   /** True once the AudioContext has been started (needs a user gesture). */
   started: boolean;
   start: () => Promise<void>;
@@ -43,6 +45,7 @@ function buildRuntime(): {
   engine: Engine;
   analysis: AnalysisService;
   controllers: ControllerService;
+  recording: RecordingService;
 } {
   const bus = new ControlBus({
     sab: { capacity: SAB_CAPACITY },
@@ -58,7 +61,8 @@ function buildRuntime(): {
   const engine = new Engine({ bus, numDecks: NUM_DECKS, workletUrl });
   const analysis = new AnalysisService();
   const controllers = new ControllerService(bus);
-  return { bus, engine, analysis, controllers };
+  const recording = new RecordingService(engine);
+  return { bus, engine, analysis, controllers, recording };
 }
 
 export function DjProvider({ children }: { children: ReactNode }): React.JSX.Element {
@@ -75,6 +79,7 @@ export function DjProvider({ children }: { children: ReactNode }): React.JSX.Ele
 
   useEffect(() => {
     return () => {
+      runtime.recording.dispose();
       void runtime.engine.dispose();
       runtime.analysis.dispose();
       runtime.controllers.dispose();
@@ -88,6 +93,7 @@ export function DjProvider({ children }: { children: ReactNode }): React.JSX.Ele
         engine: runtime.engine,
         analysis: runtime.analysis,
         controllers: runtime.controllers,
+        recording: runtime.recording,
         started,
         start,
       }}

@@ -62,4 +62,7 @@ export interface DjApi {
   readTrackById: (id: number) => Promise<LoadedFile | null>;
   librarySetAnalysis: (id: number, a: { bpm?: number; firstBeatFrame?: number }) => Promise<void>;
   libraryIncrementPlay: (id: number) => Promise<void>;
+
+  /** Save a recording (WAV bytes) to disk; returns the path or null if canceled. */
+  saveRecording: (wav: ArrayBuffer) => Promise<string | null>;
 }

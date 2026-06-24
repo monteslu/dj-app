@@ -11,6 +11,41 @@ import { Mixer } from './components/Mixer.js';
 import { Library } from './components/Library.js';
 import { AudioSettings } from './components/AudioSettings.js';
 
+function RecordButton(): React.JSX.Element {
+  const { recording, started, start } = useDj();
+  const [rec, setRec] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const toggle = async () => {
+    if (!started) {
+      await start();
+    }
+    if (rec) {
+      setSaving(true);
+      try {
+        await recording.stopAndSave();
+      } finally {
+        setRec(false);
+        setSaving(false);
+      }
+    } else {
+      await recording.start();
+      setRec(true);
+    }
+  };
+
+  return (
+    <button
+      className={`tiny record-btn ${rec ? 'recording' : ''}`}
+      onClick={() => void toggle()}
+      disabled={saving}
+      title="Record the master mix to a WAV file"
+    >
+      {saving ? 'saving…' : rec ? '⏹ stop rec' : '⏺ record'}
+    </button>
+  );
+}
+
 function Stage(): React.JSX.Element {
   const { started, start } = useDj();
   const [showAudio, setShowAudio] = useState(false);
@@ -20,6 +55,7 @@ function Stage(): React.JSX.Element {
       <div className="titlebar">
         <span className="brand">dj-app</span>
         <span className="tagline">built for the love of it</span>
+        <RecordButton />
         <button className="tiny audio-routing-btn" onClick={() => setShowAudio(true)}>
           🔊 audio routing
         </button>

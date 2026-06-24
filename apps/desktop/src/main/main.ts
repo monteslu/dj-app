@@ -17,7 +17,7 @@
 
 import { app, BrowserWindow, ipcMain, dialog, protocol, net } from 'electron';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { dirname, join, normalize } from 'node:path';
 import { LibraryService } from './library-service.js';
 import type { QueryOptions } from '@internal-dj/db';
@@ -155,6 +155,25 @@ ipcMain.handle('library:setAnalysis', (_e, id: number, a: { bpm?: number; firstB
   getLibrary().setAnalysis(id, a),
 );
 ipcMain.handle('library:incrementPlay', (_e, id: number) => getLibrary().incrementPlayCount(id));
+
+// IPC: save a recording (WAV ArrayBuffer) to disk. Defaults to a Recordings
+// folder with a timestamped name; offers a Save dialog.
+ipcMain.handle('recording:save', async (_e, wav: ArrayBuffer) => {
+  const recDir = join(app.getPath('music'), 'dj-app Recordings');
+  await mkdir(recDir, { recursive: true }).catch(() => {});
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const defaultPath = join(recDir, `mix-${stamp}.wav`);
+  const result = await dialog.showSaveDialog({
+    title: 'Save recording',
+    defaultPath,
+    filters: [{ name: 'WAV audio', extensions: ['wav'] }],
+  });
+  if (result.canceled || !result.filePath) {
+    return null;
+  }
+  await writeFile(result.filePath, Buffer.from(wav));
+  return result.filePath;
+});
 ipcMain.handle('library:readTrackById', async (_e, id: number) => {
   const track = getLibrary().query({}).find((t) => t.id === id);
   if (!track) {

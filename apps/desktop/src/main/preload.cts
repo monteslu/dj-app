@@ -22,6 +22,7 @@ const api: DjApi = {
   readTrackById: (id) => electron.ipcRenderer.invoke('library:readTrackById', id),
   librarySetAnalysis: (id, a) => electron.ipcRenderer.invoke('library:setAnalysis', id, a),
   libraryIncrementPlay: (id) => electron.ipcRenderer.invoke('library:incrementPlay', id),
+  saveRecording: (wav) => electron.ipcRenderer.invoke('recording:save', wav),
 };
 
 electron.contextBridge.exposeInMainWorld('dj', api);
