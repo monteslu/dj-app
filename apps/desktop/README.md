@@ -4,12 +4,23 @@ The internal-dj Electron app. Two decks + a center mixer, bound to the control b
 
 ## Run it
 
-From the **monorepo root** (`internal-dj/`):
+From the **repo root** (`dj-app/`):
 
 ```bash
-npm install            # installs all workspaces; downloads Electron
-npm run dev            # rebuilds native modules for Electron, builds, launches
+npm install            # installs all workspaces; a postinstall repairs Electron (see below)
+npm run dev            # rebuilds native modules for Electron, builds, launches (--no-sandbox)
 ```
+
+> **Electron binary on Node 24:** Electron's own postinstall uses an old extractor
+> that silently stalls on Node 24, leaving a half-extracted `node_modules/electron/dist`
+> (no `path.txt`) → "Electron failed to install correctly". A `postinstall` script
+> (`apps/desktop/scripts/ensure-electron.js`) re-extracts the downloaded zip with the
+> system `unzip` and writes `path.txt`. It's a silent no-op when Electron is healthy.
+> If you ever see the error anyway, run `node apps/desktop/scripts/ensure-electron.js`.
+
+> **Linux SUID sandbox:** `dev`/`start` pass `--no-sandbox` so you don't need root.
+> To run sandboxed instead: `sudo chown root node_modules/electron/dist/chrome-sandbox &&
+> sudo chmod 4755 node_modules/electron/dist/chrome-sandbox`, then drop `--no-sandbox`.
 
 > **Native module ABI note (better-sqlite3):** the library DB uses better-sqlite3,
 > a native addon. Tests run in **Node** (one ABI); Electron needs a **different**
