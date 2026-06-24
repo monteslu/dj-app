@@ -16,3 +16,17 @@ export {
   isRelative,
   type MidiOptions,
 } from './midi-options.js';
+export {
+  parseMidiMapping,
+  midiKey,
+  type MidiMapping,
+  type MidiInputControl,
+  type MidiOutputControl,
+  type ScriptFile,
+} from './midi-mapping.js';
+export {
+  MidiRouter,
+  type MidiRouterDeps,
+  type ScriptFunctions,
+  type MidiSend,
+} from './midi-router.js';
