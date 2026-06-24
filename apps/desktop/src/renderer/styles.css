@@ -45,7 +45,8 @@ body,
 
 .app {
   display: grid;
-  grid-template-rows: auto minmax(0, 1.05fr) minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1.1fr) minmax(0, 0.9fr) auto;
+  grid-template-areas: 'top' 'console' 'library' 'status';
   height: 100%;
   background:
     radial-gradient(1400px 600px at 50% -10%, #141a26 0%, transparent 70%), var(--bg);
@@ -53,6 +54,7 @@ body,
 
 /* ── titlebar ─────────────────────────────────────────────── */
 .titlebar {
+  grid-area: top;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -105,12 +107,13 @@ body,
 
 /* ── the console: deck | mixer | deck ─────────────────────── */
 .console {
+  grid-area: console;
   display: grid;
   grid-template-columns: minmax(0, 1fr) clamp(120px, 11vw, 190px) minmax(0, 1fr);
-  grid-row: 2 / 4;
   gap: 10px;
   padding: 10px 12px;
   min-height: 0;
+  overflow: hidden;
 }
 
 /* ── deck ─────────────────────────────────────────────────── */
@@ -121,8 +124,10 @@ body,
   padding: 12px 14px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 9px;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
   box-shadow: var(--shadow), var(--shadow-inset);
   position: relative;
 }
@@ -489,12 +494,13 @@ body,
 
 /* ── library ──────────────────────────────────────────────── */
 .library {
-  grid-row: 4 / 5;
+  grid-area: library;
   display: flex;
   flex-direction: column;
   min-height: 0;
   border-top: 1px solid var(--edge);
   background: var(--bg-2);
+  overflow: hidden;
 }
 .library-toolbar {
   display: flex;
@@ -593,7 +599,7 @@ body,
 
 /* ── statusbar ────────────────────────────────────────────── */
 .statusbar {
-  grid-row: 5 / 6;
+  grid-area: status;
   display: flex;
   gap: 16px;
   padding: 6px 16px;
