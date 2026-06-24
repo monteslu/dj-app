@@ -1,0 +1,19 @@
+{
+  "name": "@internal-dj/controller-host",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The Mixxx-compatible controller host: the engine/midi JS API backed by the control bus, so stock Mixxx mappings run unchanged (06-ui-controllers-effects.md §2, 10-electron-feasibility.md §6).",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@internal-dj/control-bus": "*"
+  }
+}

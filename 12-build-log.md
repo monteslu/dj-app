@@ -322,9 +322,32 @@ surgery).
 - PFL/headphone cue DEFERRED — needs the multi-output-device work (the documented M3 friction, 10 §4a).
   Low value solo (you hear the main mix); revisit if a real 2-output setup matters.
 
+## Session 1 (cont) — M7 foundation: the controller host (the strategic linchpin)
+
+The bet: implement Mixxx's `engine` global API faithfully and stock Mixxx mappings run UNCHANGED. New
+package `@internal-dj/controller-host`:
+- `engine-api.ts` — `EngineApi`, the ControllerScriptInterfaceLegacy analog backed by the control bus:
+  getValue/setValue, getParameter/setParameter (range mapping), getDefault/reset, makeConnection
+  (returns a {disconnect, trigger} handle = Mixxx ScriptConnection), connectControl, trigger,
+  beginTimer/stopTimer (20ms min, setInterval/Timeout), scratchEnable/Tick/Disable (alpha-beta filter →
+  drives rate_ratio_override), softTakeover (no-op stub for now), log. Invalid controls return 0 / no-op
+  (Mixxx semantics) rather than throwing — mappings address controls we may not have yet.
+- `midi-options.ts` — `computeMidiParameter` (the MidiController::computeValue analog): absolute 0..127→
+  0..1, invert, button/switch, diff/rot64/spread64 relative encoders. Ported to match Mixxx.
+
+THE PROOF (`mixxx-script.test.ts`): Mixxx-mapping-STYLE scripts run against our engine global — a
+PlayButton with LED feedback via makeConnection, a jog-wheel scratch via scratchEnable/Tick/Disable, an
+init() wiring 8 hotcue LEDs, softTakeover/log. All pass. The reuse thesis HOLDS: real mappings will
+transplant given this contract. (Vendoring the actual res/controllers/ + midi-components-0.0.js as a git
+subtree, Web MIDI input routing, and the .midi.xml parser are the remaining M7 app-level work.)
+
+20 controller-host tests. softTakeover is a deliberate no-op stub (mappings call it freely; value-jump
+prevention is a TODO that doesn't block correctness).
+
 ### Where we are after session 1
 M1 (first light) · M2 (keylock) · M3 (mixer: EQ/xfader/VU/pitch-bend) · M4 (cues/loops) ·
-M5 (analysis/sync/smartfader) all COMPLETE. 6 packages + the Electron app, 81 tests, boots
-cross-origin-isolated with WebGPU. Remaining: M6 (library/SQLite), M7 (controllers/Web MIDI + Mixxx
-mappings), M8 (effects), M9 (record/broadcast/stems), + PFL cue. Everything pending a human ear/eye test
-on real hardware (no display + no Electron binary in this env).
+M5 (analysis/sync/smartfader) COMPLETE; M7 controller-host FOUNDATION done (engine API proven).
+7 packages + the Electron app, **101 tests**, boots cross-origin-isolated with WebGPU. Remaining: M6
+(library/SQLite), M7 app-level (Web MIDI routing + vendored Mixxx mappings + XML parse), M8 (effects),
+M9 (record/broadcast/stems), + PFL cue + softTakeover. Everything pending a human ear/eye test on real
+hardware (no display + no Electron binary in this env).

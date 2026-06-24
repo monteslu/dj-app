@@ -14,6 +14,7 @@ export default defineConfig({
       '@internal-dj/codec': pkg('codec'),
       '@internal-dj/waveform': pkg('waveform'),
       '@internal-dj/analysis': pkg('analysis'),
+      '@internal-dj/controller-host': pkg('controller-host'),
     },
   },
   test: {

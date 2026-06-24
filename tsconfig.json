@@ -6,6 +6,7 @@
     { "path": "./packages/codec" },
     { "path": "./packages/waveform" },
     { "path": "./packages/analysis" },
+    { "path": "./packages/controller-host" },
     { "path": "./apps/desktop" }
   ]
 }
