@@ -63,12 +63,94 @@ body,
 
 /* decks layout */
 .decks {
-  flex: 1;
+  flex: 0 0 auto;
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   gap: 12px;
   padding: 12px;
   min-height: 0;
+}
+
+/* library */
+.library {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-top: 1px solid var(--edge);
+  background: var(--bg);
+}
+.library-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  background: #12151c;
+}
+.library-search {
+  flex: 1;
+  background: var(--panel-2);
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  padding: 6px 10px;
+  color: var(--text);
+  font-size: 13px;
+}
+.library-count {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.library-error {
+  font-size: 11px;
+  color: var(--danger);
+}
+.library-table-wrap {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}
+.library-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.library-table thead th {
+  position: sticky;
+  top: 0;
+  background: #1a1f29;
+  color: var(--text-dim);
+  text-align: left;
+  padding: 6px 10px;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid var(--edge);
+  font-size: 10px;
+  letter-spacing: 0.5px;
+}
+.library-table th.sorted {
+  color: var(--accent);
+}
+.library-table td {
+  padding: 4px 10px;
+  border-bottom: 1px solid #1a1d24;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 240px;
+}
+.library-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.library-table tbody tr:hover {
+  background: #1a1f29;
+}
+.library-table tbody tr.selected {
+  background: var(--accent-2);
+}
+.load-cells {
+  display: flex;
+  gap: 3px;
 }
 
 /* deck */

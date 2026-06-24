@@ -8,8 +8,16 @@ From the **monorepo root** (`internal-dj/`):
 
 ```bash
 npm install            # installs all workspaces; downloads Electron
-npm run dev            # builds packages + app, launches Electron
+npm run dev            # rebuilds native modules for Electron, builds, launches
 ```
+
+> **Native module ABI note (better-sqlite3):** the library DB uses better-sqlite3,
+> a native addon. Tests run in **Node** (one ABI); Electron needs a **different**
+> ABI. The `dev`/`start` scripts run `electron-rebuild` first so the app gets the
+> Electron build. After running the app, native modules are built for Electron —
+> if you then run `npm test` and the db tests fail with a `NODE_MODULE_VERSION`
+> mismatch, rebuild for Node: `cd node_modules/better-sqlite3 && npm run build-release`.
+> (A cleaner long-term fix is a prebuilt-per-ABI setup or running db tests under Electron.)
 
 Or from this directory:
 

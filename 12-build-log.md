@@ -406,10 +406,41 @@ controls (persisted).
 bitcrush + tempo-synced time effects (Echo beat-sync) would need a worklet later; bit-depth crush +
 fixed-time echo are well-approximated natively now.
 
+## Session 1 (cont) — M6: the library (SQLite, scan, search, browse, load-to-deck)
+
+The functional unlock — you can now have a real library, not load files one at a time.
+
+`packages/db` (main-process only): schema (Mixxx-mirroring tables), migrations runner, LibraryDb repo,
+search parser → parameterized SQL. 19 tests. (See its commit.)
+
+App integration:
+- `apps/desktop/src/main/library-service.ts` — LibraryService: owns the LibraryDb + a recursive folder
+  scanner (music-metadata reads tags; upserts tracks). Lives in the main process (Node).
+- IPC: library:query/count/scan/crates/readTrackById/setAnalysis/incrementPlay + a scanProgress stream.
+  Preload exposes them on window.dj.
+- `Library.tsx` — the track table: search box (live, Mixxx grammar), sortable columns, "+ add folder"
+  (scan with progress), double-click or per-deck buttons to load. Load path: readTrackById → decode →
+  peaks → engine.loadTrack, handed to the Deck via a CustomEvent (peaks + name). Resilient: a DB error
+  (e.g. native-ABI mismatch) shows a message instead of throwing.
+- **Bundled the main process with esbuild** (`scripts/build-main.mjs`) instead of tsc — it bundles the
+  workspace TS packages (db) into one file, keeping native modules (better-sqlite3, music-metadata) +
+  electron external. main.js is now `dist-main/main.js` (un-nested); paths adjusted.
+
+### THE native-module ABI dance (better-sqlite3) — important gotcha
+better-sqlite3 is a native addon. It can only be built for ONE Node-ABI at a time:
+- **vitest runs in Node** (NODE_MODULE_VERSION 137 here) — needs the Node build.
+- **Electron runs a different ABI** (42 = version 146) — needs `electron-rebuild`.
+Rebuilding for one BREAKS the other. Resolution: `dev`/`start` scripts run `electron-rebuild` first
+(app gets the Electron build); if you then run `npm test` and db tests fail with a NODE_MODULE_VERSION
+mismatch, rebuild for Node (`cd node_modules/better-sqlite3 && npm run build-release`). Verified BOTH
+paths work: db tests green under Node, AND the library queries succeed in Electron (smoke test, 0 errors,
+after electron-rebuild for 42). Documented in apps/desktop/README. Cleaner long-term: prebuilds per ABI
+or run db tests under Electron.
+
 ### Where we are after session 1
-M1 (first light) · M2 (keylock) · M3 (mixer) · M4 (cues/loops) · M5 (analysis/sync/smartfader) ·
-M8 (effects: QuickEffect filter + framework) COMPLETE; M7 controller-host FOUNDATION done.
-7 packages + the Electron app, **112 tests**, boots cross-origin-isolated with WebGPU. Remaining: M6
-(library/SQLite), M7 app-level (Web MIDI + vendored Mixxx mappings + XML parse), full effect units
-(routable to any channel), M9 (record/broadcast/stems), + PFL cue + softTakeover + the JS→WASM debt
-conversions (ledger above). Everything pending a human ear/eye test on real hardware.
+M1 · M2 · M3 · M4 · M5 · M6 (library) · M8 (effects) COMPLETE; M7 controller-host FOUNDATION done.
+8 packages + the Electron app, **142 tests** + 19 db tests, boots cross-origin-isolated with WebGPU,
+library works end-to-end in Electron. The 2 highest JS hot paths are WASM+SIMD (resampler, beat
+detector). Remaining: M7 app-level (Web MIDI + vendored Mixxx mappings + XML parse), full effect units,
+M9 (record/broadcast/stems), PFL cue, softTakeover, remaining WASM debt (keylock interleave, VU).
+Everything pending a human ear/eye test on real hardware.

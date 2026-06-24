@@ -4,7 +4,7 @@
  * decode → peaks → engine.loadTrack pipeline.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { deck as deckGroup, DeckKeys } from '@internal-dj/control-bus';
 import { decodeArrayBuffer } from '@internal-dj/codec';
 import {
@@ -39,6 +39,26 @@ export function Deck({ deckIndex }: Props): React.JSX.Element {
   const [detail, setDetail] = useState<PeakData | null>(null);
   const [overview, setOverview] = useState<PeakData | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Listen for library-initiated loads targeting this deck (peaks + name handoff).
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detailEv = (e as CustomEvent).detail as {
+        deckIndex: number;
+        peaks: { detail: PeakData; overview: PeakData };
+        track: { title: string | null; artist: string | null; filename: string };
+      };
+      if (detailEv.deckIndex !== deckIndex) {
+        return;
+      }
+      setDetail(detailEv.peaks.detail);
+      setOverview(detailEv.peaks.overview);
+      const t = detailEv.track;
+      setTrackName(t.artist ? `${t.artist} - ${t.title ?? t.filename}` : (t.title ?? t.filename));
+    };
+    window.addEventListener('deck-track-loaded', handler);
+    return () => window.removeEventListener('deck-track-loaded', handler);
+  }, [deckIndex]);
 
   const loadFile = useCallback(
     async (file: { name: string; data: ArrayBuffer }) => {

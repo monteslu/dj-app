@@ -9,9 +9,57 @@ export interface LoadedFile {
   data: ArrayBuffer;
 }
 
+/** A library track row (mirrors @internal-dj/db TrackRow; kept local to avoid a
+ * renderer dependency on the main-only db package). */
+export interface LibTrack {
+  id: number;
+  location: string;
+  filename: string;
+  artist: string | null;
+  title: string | null;
+  album: string | null;
+  genre: string | null;
+  year: string | null;
+  duration: number | null;
+  bitrate: number | null;
+  bpm: number;
+  firstBeatFrame: number;
+  key: string | null;
+  rating: number;
+  timesPlayed: number;
+  filetype: string | null;
+}
+
+export interface LibQuery {
+  search?: string;
+  sortColumn?: string;
+  sortDesc?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+export interface ScanSummary {
+  scanned: number;
+  added: number;
+}
+export interface ScanProgress {
+  scanned: number;
+  added: number;
+  current: string;
+}
+
 export interface DjApi {
   /** Open a file dialog and return the chosen track's bytes (or null). */
   openTrack: () => Promise<LoadedFile | null>;
   /** Read a dropped file path's bytes. */
   readTrack: (path: string) => Promise<LoadedFile>;
+
+  // library
+  libraryQuery: (q: LibQuery) => Promise<LibTrack[]>;
+  libraryCount: (search?: string) => Promise<number>;
+  libraryScan: () => Promise<ScanSummary | null>;
+  onScanProgress: (cb: (p: ScanProgress) => void) => () => void;
+  readTrackById: (id: number) => Promise<LoadedFile | null>;
+  librarySetAnalysis: (id: number, a: { bpm?: number; firstBeatFrame?: number }) => Promise<void>;
+  libraryIncrementPlay: (id: number) => Promise<void>;
 }

@@ -4,14 +4,16 @@
   "private": true,
   "type": "module",
   "description": "The internal-dj Electron app.",
-  "main": "dist-main/main/main.js",
+  "main": "dist-main/main.js",
   "scripts": {
     "build:renderer": "vite build",
     "build:worklet": "vite build --config vite.worklet.config.ts",
-    "build:main": "tsc -p tsconfig.main.json",
+    "build:main": "node scripts/build-main.mjs",
+    "typecheck:main": "tsc -p tsconfig.main.json --noEmit",
     "build": "npm run build:renderer && npm run build:worklet && npm run build:main",
-    "dev": "npm run build && electron . --dev",
-    "start": "electron ."
+    "rebuild:electron": "electron-rebuild -m ../../node_modules/better-sqlite3",
+    "dev": "npm run rebuild:electron && npm run build && electron . --dev",
+    "start": "npm run rebuild:electron && electron ."
   },
   "dependencies": {
     "@internal-dj/audio-engine": "*",
@@ -19,10 +21,12 @@
     "@internal-dj/control-bus": "*",
     "@internal-dj/waveform": "*",
     "better-sqlite3": "^12.11.1",
+    "music-metadata": "^11.13.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@electron/rebuild": "^4.0.4",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.4",

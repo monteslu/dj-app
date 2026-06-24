@@ -10,6 +10,18 @@ import type { DjApi } from '../shared/ipc.js';
 const api: DjApi = {
   openTrack: () => electron.ipcRenderer.invoke('dialog:openTrack'),
   readTrack: (path: string) => electron.ipcRenderer.invoke('track:read', path),
+
+  libraryQuery: (q) => electron.ipcRenderer.invoke('library:query', q),
+  libraryCount: (search) => electron.ipcRenderer.invoke('library:count', search),
+  libraryScan: () => electron.ipcRenderer.invoke('library:scan'),
+  onScanProgress: (cb) => {
+    const listener = (_e: unknown, p: unknown) => cb(p as never);
+    electron.ipcRenderer.on('library:scanProgress', listener);
+    return () => electron.ipcRenderer.removeListener('library:scanProgress', listener);
+  },
+  readTrackById: (id) => electron.ipcRenderer.invoke('library:readTrackById', id),
+  librarySetAnalysis: (id, a) => electron.ipcRenderer.invoke('library:setAnalysis', id, a),
+  libraryIncrementPlay: (id) => electron.ipcRenderer.invoke('library:incrementPlay', id),
 };
 
 electron.contextBridge.exposeInMainWorld('dj', api);

@@ -19,10 +19,12 @@ import { app, BrowserWindow, ipcMain, dialog, protocol, net } from 'electron';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { readFile } from 'node:fs/promises';
 import { dirname, join, normalize } from 'node:path';
+import { LibraryService } from './library-service.js';
+import type { QueryOptions } from '@internal-dj/db';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-// main.js lives at dist-main/main/main.js → renderer is two levels up.
-const RENDERER_DIR = join(__dirname, '../../dist-renderer');
+// main.js (esbuild-bundled) lives at dist-main/main.js → renderer is one up.
+const RENDERER_DIR = join(__dirname, '../dist-renderer');
 const isDev = process.argv.includes('--dev');
 
 const SCHEME = 'app';
@@ -135,6 +137,50 @@ ipcMain.handle('track:read', async (_e, path: string) => {
   const buf = await readFile(path);
   const arrayBuffer = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
   return { name: path.split(/[\\/]/).pop() ?? 'track', data: arrayBuffer };
+});
+
+// --- Library service + IPC -------------------------------------------------
+
+let library: LibraryService | null = null;
+function getLibrary(): LibraryService {
+  if (!library) {
+    library = new LibraryService(join(app.getPath('userData'), 'library.db'));
+  }
+  return library;
+}
+
+ipcMain.handle('library:query', (_e, opts: QueryOptions) => getLibrary().query(opts));
+ipcMain.handle('library:count', (_e, search?: string) => getLibrary().count(search));
+ipcMain.handle('library:crates', () => getLibrary().listCrates());
+ipcMain.handle('library:crateTracks', (_e, id: number) => getLibrary().crateTracks(id));
+ipcMain.handle('library:setAnalysis', (_e, id: number, a: { bpm?: number; firstBeatFrame?: number }) =>
+  getLibrary().setAnalysis(id, a),
+);
+ipcMain.handle('library:incrementPlay', (_e, id: number) => getLibrary().incrementPlayCount(id));
+ipcMain.handle('library:readTrackById', async (_e, id: number) => {
+  const track = getLibrary().query({}).find((t) => t.id === id);
+  if (!track) {
+    return null;
+  }
+  const buf = await readFile(track.location);
+  const arrayBuffer = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+  return { name: track.filename, data: arrayBuffer };
+});
+
+// IPC: pick a folder + scan it, streaming progress back to the renderer.
+ipcMain.handle('library:scan', async (e) => {
+  const result = await dialog.showOpenDialog({
+    title: 'Add music folder',
+    properties: ['openDirectory'],
+  });
+  if (result.canceled || result.filePaths.length === 0) {
+    return null;
+  }
+  const root = result.filePaths[0]!;
+  const summary = await getLibrary().scanDirectory(root, (p) => {
+    e.sender.send('library:scanProgress', p);
+  });
+  return summary;
 });
 
 app.whenReady().then(() => {

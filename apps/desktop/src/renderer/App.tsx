@@ -7,6 +7,7 @@
 import { DjProvider, useDj, NUM_DECKS } from './dj-context.js';
 import { Deck } from './components/Deck.js';
 import { Mixer } from './components/Mixer.js';
+import { Library } from './components/Library.js';
 
 function Stage(): React.JSX.Element {
   const { started, start } = useDj();
@@ -27,6 +28,7 @@ function Stage(): React.JSX.Element {
         <Mixer />
         <Deck deckIndex={1} />
       </main>
+      <Library />
       <footer className="statusbar">
         <span>{NUM_DECKS} decks</span>
         <span>{started ? 'audio running' : 'audio idle — click start or load a track'}</span>
