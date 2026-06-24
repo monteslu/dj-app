@@ -133,7 +133,8 @@ describe('ControlBus SAB mirror', () => {
 
 describe('standardControls', () => {
   it('defines a consistent surface for N decks', () => {
-    const bus = new ControlBus({ sab: { capacity: 1024 } });
+    // 4 decks × (36 hotcues × 6 + loops + beatloops + transport/mixer) ≈ 1187 controls.
+    const bus = new ControlBus({ sab: { capacity: 4096 } });
     bus.defineAll(standardControls(4));
     // sanity: deck + master controls exist with expected defaults
     expect(bus.get(deck(1), DeckKeys.volume)).toBe(1);

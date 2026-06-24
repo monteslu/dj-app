@@ -157,6 +157,43 @@ body,
   color: var(--cue);
 }
 
+/* hotcues */
+.hotcue-row {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+}
+.hotcue-pad {
+  padding: 8px 0;
+  font-size: 11px;
+  background: var(--panel-2);
+  border: 1px solid var(--edge);
+  color: var(--text-dim);
+}
+.hotcue-pad.set {
+  background: var(--cue);
+  color: #2a1a02;
+  border-color: var(--cue);
+  font-weight: 700;
+}
+
+/* loops */
+.loop-row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.loop-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--edge);
+  margin: 0 4px;
+}
+.beatloop {
+  min-width: 26px;
+}
+
 /* eq + volume */
 .deck-eq,
 .deck-volume {

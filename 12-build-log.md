@@ -223,3 +223,48 @@ hardware, which I can't do headless. The logic is the proven pattern; flag for h
 ### M2 status: COMPLETE (pending an ear test on real hardware)
 45 tests green. App boots clean with keylock wired. The scary milestone is behind us and it's a
 re-housing of Mixxx's own SoundTouch engine, not new science.
+
+---
+
+## Session 1 (cont) — M4: the EngineControl stack (cues + loops)
+
+Skipped straight to M4 (cues/loops) over M3 (mixer polish) because M1 already gave a working mixer and
+cues/loops are the heart of DJing + they exercise the seek/loop architecture.
+
+### Architecture decision: where the EngineControl stack lives
+Mixxx runs its EngineControl stack inside the audio callback. We split it: the sample-accurate part
+(loop wrap) lives in the worklet's DeckPlayback; the *logic* (set cue, activate hotcue, size a
+beatloop) lives MAIN-THREAD as bus subscribers (`packages/audio-engine/src/controls/`). Rationale:
+cues/loops are about manipulating read position, which the worklet owns — but the triggers are sparse
+(a click), so running them per-block in the worklet is wasteful. Main-thread controls translate bus
+triggers → engine messages (`setLoop`/`loopEnable`/`seek`). Keeps the worklet lean and the
+control-bus-as-spine pattern intact.
+
+### What landed
+- `deck-playback.ts` loop support: `setLoop/setLoopEnabled`, and a sample-accurate wrap in
+  `pullResampled` — when position reaches loopEnd it jumps back to loopStart KEEPING the fractional
+  overshoot (phase-continuous), with a **64-frame seam crossfade** (mix the pre-seam tail with the
+  post-loopStart head) so the wrap is click-free. An active loop overrides end-of-track.
+- `controls/cue-control.ts` — main cue + 36 hotcues (set/activate/clear) as bus subscribers.
+- `controls/loop-control.ts` — loop in/out, reloop toggle, halve/double, loop exit, and beatloops
+  (sized from `file_bpm` until M5 gives a real beatgrid).
+- control-bus: added cue/loop/hotcue/beatloop keys + parameterized helpers (`hotcuePositionKey(n)`,
+  `beatloopActivateKey(size)`), MAX_HOTCUES=36, BEATLOOP_SIZES (1/32..512). Registered all in
+  `standardControls` (now 605 controls for 2 decks, 1187 for 4 — SAB bumped to 2048 in the app).
+- Engine wires a CueControl + LoopControl per deck, providing positionFrames (from the bus),
+  seekFrames (posts a seek message + reflects on the bus), and applyLoop/enableLoop (post messages).
+- UI: `HotcueRow` (8 pads: click empty=set, set=jump, shift/right-click=clear) + `LoopRow` (IN/OUT/
+  LOOP/½/2× + 1/2/4/8/16 beatloops). Waveform overlay: hotcue markers + loop region drawn on the
+  overview (extended the Canvas2D renderer with a Marker/LoopRegion overlay).
+
+### THE bug worth remembering: momentary triggers must self-reset
+A loop test failed: pressing reloop_toggle twice only toggled once. Cause: the control bus suppresses
+no-op sets (`bIgnoreNops`), so a trigger control left at 1 never fires again. **Fix:** trigger handlers
+set the control back to 0 after acting (proper push-button semantics). This is now the standard pattern
+for ALL momentary controls (`CueControl.on`/`LoopControl.on` wrap it). Every Mixxx mapping that does
+`engine.setValue(g, 'beatloop_4_activate', 1)` relies on this; without it the second press is dead.
+
+### M4 status: COMPLETE
+56 tests green (11 new loop/cue tests incl. the sample-accurate wrap). App boots clean. Hotcues,
+beatloops, manual loops, halve/double, reloop all wired end to end and visible on the waveform.
+Real loop-seam audio quality is an ear test (the crossfade logic is in place + structurally tested).

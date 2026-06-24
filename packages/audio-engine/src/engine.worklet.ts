@@ -88,6 +88,14 @@ class EngineProcessor extends AudioWorkletProcessor {
         this.decks[msg.deck]?.playback.seekFrames(msg.frame);
         break;
       }
+      case 'setLoop': {
+        this.decks[msg.deck]?.playback.setLoop(msg.start, msg.end, msg.enabled);
+        break;
+      }
+      case 'loopEnable': {
+        this.decks[msg.deck]?.playback.setLoopEnabled(msg.enabled);
+        break;
+      }
     }
   }
 

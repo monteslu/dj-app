@@ -8,7 +8,7 @@
  * subset we wire as we build, grown milestone by milestone.
  */
 
-import type { Group } from './types.js';
+import type { Group, Key } from './types.js';
 
 // ---------------------------------------------------------------------------
 // Group constructors (Mixxx conventions)
@@ -119,9 +119,62 @@ export const DeckKeys = {
   vuMeterL: 'vu_meter_left',
   vuMeterR: 'vu_meter_right',
   peakIndicator: 'peak_indicator',
+
+  // main cue (Mixxx names)
+  cuePoint: 'cue_point', // frames; -1 = unset
+  cueSet: 'cue_set',
+  cueGotoAndStop: 'cue_gotoandstop',
+
+  // loops (Mixxx names). Positions in frames; -1 = unset.
+  loopStartPosition: 'loop_start_position',
+  loopEndPosition: 'loop_end_position',
+  loopEnabled: 'loop_enabled',
+  loopIn: 'loop_in',
+  loopOut: 'loop_out',
+  reloopToggle: 'reloop_toggle',
+  loopHalve: 'loop_halve',
+  loopDouble: 'loop_double',
+  loopExit: 'loop_exit',
+  // beatloop_X_toggle controls are generated per-size (see beatloopKey).
 } as const;
 
 export type DeckKey = (typeof DeckKeys)[keyof typeof DeckKeys];
+
+/** Max hotcues per deck (Mixxx supports 36). */
+export const MAX_HOTCUES = 36;
+
+/** Beatloop sizes Mixxx exposes (beats). */
+export const BEATLOOP_SIZES = [
+  0.03125, 0.0625, 0.125, 0.25, 0.5, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512,
+] as const;
+
+/** Hotcue control keys (Mixxx `hotcue_N_*`, 1-based N). */
+export function hotcuePositionKey(n: number): Key {
+  return `hotcue_${n}_position`; // frames; -1 = unset
+}
+export function hotcueActivateKey(n: number): Key {
+  return `hotcue_${n}_activate`;
+}
+export function hotcueSetKey(n: number): Key {
+  return `hotcue_${n}_set`;
+}
+export function hotcueClearKey(n: number): Key {
+  return `hotcue_${n}_clear`;
+}
+export function hotcueEnabledKey(n: number): Key {
+  return `hotcue_${n}_enabled`; // 1 if set
+}
+export function hotcueColorKey(n: number): Key {
+  return `hotcue_${n}_color`;
+}
+
+/** Beatloop toggle key for a given size (Mixxx `beatloop_X_toggle`). */
+export function beatloopToggleKey(size: number): Key {
+  return `beatloop_${size}_toggle`;
+}
+export function beatloopActivateKey(size: number): Key {
+  return `beatloop_${size}_activate`;
+}
 
 // ---------------------------------------------------------------------------
 // Master / crossfader control keys (Mixxx names).

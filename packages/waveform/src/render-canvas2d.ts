@@ -7,6 +7,20 @@
 
 import type { PeakData } from './peaks.js';
 
+/** A point marker (hotcue, main cue) at a track fraction 0..1. */
+export interface Marker {
+  fraction: number;
+  color: string;
+  label?: string;
+}
+
+/** A loop region (start/end fractions 0..1). */
+export interface LoopRegion {
+  start: number;
+  end: number;
+  active: boolean;
+}
+
 export interface WaveformColors {
   background: string;
   /** Waveform body color. */
@@ -31,11 +45,17 @@ export const DEFAULT_COLORS: WaveformColors = {
  * Draw the full-track overview: the whole waveform scaled to the canvas width,
  * with the played portion tinted and a playhead at `positionFraction` (0..1).
  */
+export interface Overlay {
+  markers?: Marker[];
+  loop?: LoopRegion;
+}
+
 export function drawOverview(
   canvas: HTMLCanvasElement | OffscreenCanvas,
   peaks: PeakData,
   positionFraction: number,
   colors: WaveformColors = DEFAULT_COLORS,
+  overlay?: Overlay,
 ): void {
   const ctx = canvas.getContext('2d') as
     | CanvasRenderingContext2D
@@ -71,6 +91,27 @@ export function drawOverview(
     ctx.moveTo(x + 0.5, mid - amp);
     ctx.lineTo(x + 0.5, mid + amp);
     ctx.stroke();
+  }
+
+  // loop region
+  if (overlay?.loop && overlay.loop.end > overlay.loop.start) {
+    const x0 = overlay.loop.start * w;
+    const x1 = overlay.loop.end * w;
+    ctx.fillStyle = overlay.loop.active ? 'rgba(74,222,128,0.18)' : 'rgba(125,134,150,0.12)';
+    ctx.fillRect(x0, 0, x1 - x0, h);
+  }
+
+  // markers (hotcues / main cue)
+  if (overlay?.markers) {
+    for (const m of overlay.markers) {
+      const mx = Math.round(m.fraction * w);
+      ctx.strokeStyle = m.color;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(mx + 0.5, 0);
+      ctx.lineTo(mx + 0.5, h);
+      ctx.stroke();
+    }
   }
 
   // playhead

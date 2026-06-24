@@ -5,8 +5,25 @@
  * controllers and knobs.
  */
 
-import { AppKeys, APP, deck, DeckKeys, MASTER, MasterKeys } from './keys.js';
-import type { ControlDef } from './types.js';
+import {
+  AppKeys,
+  APP,
+  deck,
+  DeckKeys,
+  MASTER,
+  MasterKeys,
+  MAX_HOTCUES,
+  BEATLOOP_SIZES,
+  hotcuePositionKey,
+  hotcueActivateKey,
+  hotcueSetKey,
+  hotcueClearKey,
+  hotcueEnabledKey,
+  hotcueColorKey,
+  beatloopToggleKey,
+  beatloopActivateKey,
+} from './keys.js';
+import type { ControlDef, Group } from './types.js';
 
 /** Build the per-deck control definitions for deck group `g`. */
 function deckControls(g: string): ControlDef[] {
@@ -53,7 +70,54 @@ function deckControls(g: string): ControlDef[] {
     { group: g, key: DeckKeys.vuMeterL, default: 0 },
     { group: g, key: DeckKeys.vuMeterR, default: 0 },
     { group: g, key: DeckKeys.peakIndicator, default: 0 },
+
+    // main cue (persisted with the track later; in-memory for now)
+    { group: g, key: DeckKeys.cuePoint, default: -1 },
+    { group: g, key: DeckKeys.cueSet, default: 0 },
+    { group: g, key: DeckKeys.cueGotoAndStop, default: 0 },
+
+    // loops
+    { group: g, key: DeckKeys.loopStartPosition, default: -1 },
+    { group: g, key: DeckKeys.loopEndPosition, default: -1 },
+    { group: g, key: DeckKeys.loopEnabled, default: 0 },
+    { group: g, key: DeckKeys.loopIn, default: 0 },
+    { group: g, key: DeckKeys.loopOut, default: 0 },
+    { group: g, key: DeckKeys.reloopToggle, default: 0 },
+    { group: g, key: DeckKeys.loopHalve, default: 0 },
+    { group: g, key: DeckKeys.loopDouble, default: 0 },
+    { group: g, key: DeckKeys.loopExit, default: 0 },
+
+    ...hotcueControls(g),
+    ...beatloopControls(g),
   ];
+}
+
+/** Hotcue controls for all MAX_HOTCUES slots. */
+function hotcueControls(g: Group): ControlDef[] {
+  const defs: ControlDef[] = [];
+  for (let n = 1; n <= MAX_HOTCUES; n++) {
+    defs.push(
+      { group: g, key: hotcuePositionKey(n), default: -1 },
+      { group: g, key: hotcueActivateKey(n), default: 0 },
+      { group: g, key: hotcueSetKey(n), default: 0 },
+      { group: g, key: hotcueClearKey(n), default: 0 },
+      { group: g, key: hotcueEnabledKey(n), default: 0 },
+      { group: g, key: hotcueColorKey(n), default: 0 },
+    );
+  }
+  return defs;
+}
+
+/** Beatloop toggle/activate controls for each size. */
+function beatloopControls(g: Group): ControlDef[] {
+  const defs: ControlDef[] = [];
+  for (const size of BEATLOOP_SIZES) {
+    defs.push(
+      { group: g, key: beatloopToggleKey(size), default: 0 },
+      { group: g, key: beatloopActivateKey(size), default: 0 },
+    );
+  }
+  return defs;
 }
 
 /** Master section controls. */

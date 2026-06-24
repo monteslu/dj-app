@@ -15,6 +15,8 @@ import {
 import { useDj, useControl, useControlValue } from '../dj-context.js';
 import { WaveformView } from './WaveformView.js';
 import { Knob } from './Knob.js';
+import { HotcueRow } from './HotcueRow.js';
+import { LoopRow } from './LoopRow.js';
 
 interface Props {
   deckIndex: number; // 0-based
@@ -159,6 +161,9 @@ export function Deck({ deckIndex }: Props): React.JSX.Element {
           {play > 0.5 ? '❚❚' : '▶'}
         </button>
       </div>
+
+      <HotcueRow deckIndex={deckIndex} />
+      <LoopRow deckIndex={deckIndex} />
 
       <div className="deck-eq">
         <Knob group={grp} ckey={DeckKeys.eqHigh} label="HI" min={0} max={4} center={1} />

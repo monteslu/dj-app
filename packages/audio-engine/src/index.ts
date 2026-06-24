@@ -9,6 +9,8 @@ export { Engine, type EngineOptions } from './engine.js';
 export { DeckPlayback, type DeckTrack } from './deck-playback.js';
 export { KeylockScaler } from './keylock-scaler.js';
 export type { Scaler, SourcePull } from './scaler.js';
+export { CueControl } from './controls/cue-control.js';
+export { LoopControl } from './controls/loop-control.js';
 export { calculateSpeed, rateRatioFromSlider } from './rate.js';
 export {
   getXfadeGains,

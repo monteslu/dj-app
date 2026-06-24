@@ -14,4 +14,7 @@ export {
   drawScrolling,
   DEFAULT_COLORS,
   type WaveformColors,
+  type Marker,
+  type LoopRegion,
+  type Overlay,
 } from './render-canvas2d.js';

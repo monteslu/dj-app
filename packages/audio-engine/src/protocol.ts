@@ -70,7 +70,29 @@ export interface SeekMessage {
   frame: number;
 }
 
-export type EngineMessage = EngineInitMessage | LoadTrackMessage | EjectMessage | SeekMessage;
+/** Set/clear/move the loop region for a deck (frames; -1 to clear). */
+export interface SetLoopMessage {
+  type: 'setLoop';
+  deck: number;
+  start: number;
+  end: number;
+  enabled: boolean;
+}
+
+/** Enable/disable the current loop without changing its bounds. */
+export interface LoopEnableMessage {
+  type: 'loopEnable';
+  deck: number;
+  enabled: boolean;
+}
+
+export type EngineMessage =
+  | EngineInitMessage
+  | LoadTrackMessage
+  | EjectMessage
+  | SeekMessage
+  | SetLoopMessage
+  | LoopEnableMessage;
 
 /** Messages the worklet posts back to the main thread (rare; mostly diagnostics). */
 export interface WorkletReadyMessage {

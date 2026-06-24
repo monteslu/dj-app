@@ -25,6 +25,8 @@ import { createDeckGraph, eqKnobToDb, type DeckGraphNodes } from './deck-graph.j
 import { crossfaderGainForChannel, orientationFromValue } from './crossfader.js';
 import type { DeckControlIndices, EngineMessage, WorkletMessage } from './protocol.js';
 import type { DecodedTrack } from './decoded-track.js';
+import { CueControl } from './controls/cue-control.js';
+import { LoopControl } from './controls/loop-control.js';
 
 export interface EngineOptions {
   bus: ControlBus;
@@ -52,6 +54,8 @@ export class Engine {
   private master: GainNode | null = null;
   private deckGraphs: DeckGraphNodes[] = [];
   private disconnects: Array<() => void> = [];
+  private cueControls: CueControl[] = [];
+  private loopControls: LoopControl[] = [];
 
   constructor(opts: EngineOptions) {
     this.bus = opts.bus;
@@ -96,6 +100,7 @@ export class Engine {
       this.deckGraphs.push(g);
       deckIndices.push(this.deckIndexMap(d));
       this.wireDeckParams(d, g);
+      this.installDeckControls(d, ctx.sampleRate);
     }
     this.wireMasterParams();
 
@@ -196,6 +201,57 @@ export class Engine {
     this.disconnects.push(this.bus.connect(MASTER, MasterKeys.gain, setParam));
   }
 
+  /** Current play position of a deck in source frames (from the bus). */
+  private positionFrames(d: number): number {
+    const g = deckGroup(d + 1);
+    return this.bus.get(g, DeckKeys.playPosition) * this.bus.get(g, DeckKeys.trackSamples);
+  }
+
+  /** Seek a deck to an absolute source frame (and reflect it on the bus). */
+  private seekFrames(d: number, frame: number): void {
+    if (!this.node) {
+      return;
+    }
+    this.node.port.postMessage({ type: 'seek', deck: d, frame } satisfies EngineMessage);
+    const g = deckGroup(d + 1);
+    const frames = this.bus.get(g, DeckKeys.trackSamples);
+    if (frames > 0) {
+      this.bus.set(g, DeckKeys.playPosition, frame / frames);
+    }
+  }
+
+  /** Install the per-deck EngineControl stack (cue + loop). */
+  private installDeckControls(d: number, sampleRate: number): void {
+    const g = deckGroup(d + 1);
+    const node = this.node!;
+    const cue = new CueControl({
+      bus: this.bus,
+      group: g,
+      positionFrames: () => this.positionFrames(d),
+      seekFrames: (frame) => this.seekFrames(d, frame),
+      stop: () => this.bus.set(g, DeckKeys.play, 0),
+    });
+    const loop = new LoopControl({
+      bus: this.bus,
+      group: g,
+      sampleRate,
+      positionFrames: () => this.positionFrames(d),
+      trackFrames: () => this.bus.get(g, DeckKeys.trackSamples),
+      applyLoop: (start, end, enabled) =>
+        node.port.postMessage({
+          type: 'setLoop',
+          deck: d,
+          start,
+          end,
+          enabled,
+        } satisfies EngineMessage),
+      enableLoop: (enabled) =>
+        node.port.postMessage({ type: 'loopEnable', deck: d, enabled } satisfies EngineMessage),
+    });
+    this.cueControls.push(cue);
+    this.loopControls.push(loop);
+  }
+
   /** Load a decoded track into a deck (ships sample data to the worklet via SAB). */
   loadTrack(d: number, track: DecodedTrack): void {
     if (!this.node) {
@@ -252,6 +308,14 @@ export class Engine {
     for (const off of this.disconnects) {
       off();
     }
+    for (const c of this.cueControls) {
+      c.dispose();
+    }
+    for (const l of this.loopControls) {
+      l.dispose();
+    }
+    this.cueControls = [];
+    this.loopControls = [];
     this.disconnects = [];
     this.deckGraphs = [];
     this.node?.port.close();

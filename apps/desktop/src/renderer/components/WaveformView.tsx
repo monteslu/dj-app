@@ -10,10 +10,20 @@ import {
   drawOverview,
   drawScrolling,
   type PeakData,
+  type Overlay,
+  type Marker,
   DEFAULT_COLORS,
 } from '@internal-dj/waveform';
 import { useDj } from '../dj-context.js';
-import { deck as deckGroup, DeckKeys } from '@internal-dj/control-bus';
+import {
+  deck as deckGroup,
+  DeckKeys,
+  hotcuePositionKey,
+  hotcueEnabledKey,
+} from '@internal-dj/control-bus';
+
+const HOTCUE_COLORS = ['#ff5a5a', '#ffb84d', '#4ade80', '#37b6ff', '#a78bfa', '#f472b6'];
+const VISIBLE_HOTCUES = 8;
 
 interface Props {
   deckIndex: number; // 0-based
@@ -46,8 +56,35 @@ export function WaveformView({
       const frames = bus.get(grp, DeckKeys.trackSamples);
       const positionFrames = fraction * frames;
 
+      // Build the overlay (hotcue markers + loop region) from the bus.
+      const overlay: Overlay = { markers: [], loop: undefined };
+      if (frames > 0) {
+        const markers: Marker[] = [];
+        for (let n = 1; n <= VISIBLE_HOTCUES; n++) {
+          if (bus.get(grp, hotcueEnabledKey(n)) > 0.5) {
+            const pos = bus.get(grp, hotcuePositionKey(n));
+            if (pos >= 0) {
+              markers.push({
+                fraction: pos / frames,
+                color: HOTCUE_COLORS[(n - 1) % HOTCUE_COLORS.length]!,
+              });
+            }
+          }
+        }
+        overlay.markers = markers;
+        const ls = bus.get(grp, DeckKeys.loopStartPosition);
+        const le = bus.get(grp, DeckKeys.loopEndPosition);
+        if (ls >= 0 && le > ls) {
+          overlay.loop = {
+            start: ls / frames,
+            end: le / frames,
+            active: bus.get(grp, DeckKeys.loopEnabled) > 0.5,
+          };
+        }
+      }
+
       if (overviewCanvas && overview) {
-        drawOverview(overviewCanvas, overview, fraction, DEFAULT_COLORS);
+        drawOverview(overviewCanvas, overview, fraction, DEFAULT_COLORS, overlay);
       }
       if (scrollCanvas && detail) {
         drawScrolling(scrollCanvas, detail, positionFrames, framesPerPx, DEFAULT_COLORS);

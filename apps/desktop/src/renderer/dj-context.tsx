@@ -20,7 +20,9 @@ import { ControlBus, standardControls, type Group, type Key } from '@internal-dj
 import { Engine } from '@internal-dj/audio-engine';
 
 export const NUM_DECKS = 2;
-const SAB_CAPACITY = 512; // plenty for 2 decks + master + headroom
+// 2 decks each carry 36 hotcues × 6 keys + loops + beatloops, so the surface is
+// large. 2048 Float64 slots = 16KB; trivially cheap, with ample headroom.
+const SAB_CAPACITY = 2048;
 
 export interface DjRuntime {
   bus: ControlBus;
