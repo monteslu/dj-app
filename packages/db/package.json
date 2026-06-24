@@ -1,0 +1,22 @@
+{
+  "name": "@internal-dj/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The library database: SQLite (better-sqlite3) schema, migrations, repositories, search query parser. Main-process only. Mirrors Mixxx's schema (05-library-and-data.md §1).",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.0.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.0"
+  }
+}

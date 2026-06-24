@@ -8,6 +8,7 @@
     { "path": "./packages/analysis" },
     { "path": "./packages/controller-host" },
     { "path": "./packages/dsp-wasm" },
+    { "path": "./packages/db" },
     { "path": "./apps/desktop" }
   ]
 }
