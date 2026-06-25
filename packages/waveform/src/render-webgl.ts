@@ -48,8 +48,14 @@ void main() {
   float centerX = u_res.x * 0.5;
   float mid = u_res.y * 0.5;
 
-  // source frame under this pixel
-  float frame = u_positionFrames + (x - centerX) * u_framesPerPx;
+  // source frame under this pixel. SNAP the scroll origin to the pixel grid
+  // (Mixxx: xVisualFrame = round(pos/incrPerPx)*incrPerPx). This makes every pixel
+  // always cover the SAME frame range regardless of sub-pixel scroll — so a given
+  // bucket renders the same height every frame and only its PIXEL shifts. Without
+  // the snap, sub-pixel position changes each pixel's sampled bucket continuously
+  // (the height shimmer). Movement is whole-pixel; heights are frozen.
+  float snappedPos = floor(u_positionFrames / u_framesPerPx + 0.5) * u_framesPerPx;
+  float frame = snappedPos + (x - centerX) * u_framesPerPx;
 
   // background gradient
   float vign = abs(y - mid) / mid;
@@ -80,7 +86,7 @@ void main() {
     float beat = (frame - u_firstBeat) / u_framesPerBeat;
     float nearest = floor(beat + 0.5);
     float beatFrame = u_firstBeat + nearest * u_framesPerBeat;
-    float beatX = centerX + (beatFrame - u_positionFrames) / u_framesPerPx;
+    float beatX = centerX + (beatFrame - snappedPos) / u_framesPerPx;
     float d = abs(x - beatX);
     float isDown = mod(nearest, 4.0);
     if (isDown < 0.5) {
