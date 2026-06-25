@@ -1,5 +1,6 @@
 /**
- * @internal-dj/waveform — peak precompute + canvas rendering.
+ * @internal-dj/waveform — peak precompute + GPU (WebGL) waveform rendering, with
+ * a Canvas2D fallback for the small static cases (library thumbnails) and overview.
  */
 
 export {
@@ -19,3 +20,5 @@ export {
   type Overlay,
   type ScrollOverlay,
 } from './render-canvas2d.js';
+// GPU scrolling-waveform renderer (the live, per-frame path).
+export { WaveformGL, type ScrollGLParams } from './render-webgl.js';

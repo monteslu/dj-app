@@ -7,11 +7,11 @@
  */
 
 import { memo, useEffect, useRef } from 'react';
-import { drawScrolling, DEFAULT_COLORS } from '@internal-dj/waveform';
-import { deck as deckGroup, DeckKeys } from '@internal-dj/control-bus';
 import { useDj } from '../dj-context.js';
-import { getDeckTrack } from '../deck-state.js';
+import { WaveformLaneController } from '../waveform-lane.js';
 
+// Thin shell: mount a canvas, hand it to the controller (which owns all the GPU
+// render logic + rAF loop). No render logic in the JSX.
 const DeckLane = memo(function DeckLane({
   deckIndex,
   framesPerPx,
@@ -20,53 +20,17 @@ const DeckLane = memo(function DeckLane({
   framesPerPx: number;
 }): React.JSX.Element {
   const { bus } = useDj();
-  const scrollRef = useRef<HTMLCanvasElement>(null);
-  const g = deckGroup(deckIndex + 1);
-
-  // Size the canvas backing store only when the element actually resizes (via a
-  // ResizeObserver), NOT every frame — reading getBoundingClientRect + setting
-  // canvas.width per rAF forces a layout reflow + clears the canvas, which causes
-  // the choppiness. Setting .width also resets the context, so do it sparingly.
-  useEffect(() => {
-    const c = scrollRef.current;
-    if (!c) return;
-    const fit = () => {
-      const w = Math.floor(c.clientWidth);
-      if (w && c.width !== w) c.width = w;
-    };
-    fit();
-    const ro = new ResizeObserver(fit);
-    ro.observe(c);
-    return () => ro.disconnect();
-  }, []);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    let raf = 0;
-    const tick = () => {
-      const canvas = scrollRef.current;
-      if (canvas) {
-        const st = getDeckTrack(deckIndex);
-        if (st.peaks) {
-          const frames = bus.get(g, DeckKeys.trackSamples);
-          const fraction = bus.get(g, DeckKeys.playPosition);
-          const fileBpm = bus.get(g, DeckKeys.fileBpm);
-          const framesPerBeat = fileBpm > 0 ? (60 / fileBpm) * 48000 : 0;
-          const fbf = bus.get(g, DeckKeys.firstBeatFrame);
-          drawScrolling(canvas, st.peaks.detail, fraction * frames, framesPerPx, DEFAULT_COLORS, {
-            firstBeatFrame: fbf >= 0 ? fbf : 0,
-            framesPerBeat,
-          });
-        }
-      }
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [bus, g, deckIndex, framesPerPx]);
+    if (!canvasRef.current) return;
+    const ctrl = new WaveformLaneController(canvasRef.current, bus, deckIndex, framesPerPx);
+    return () => ctrl.dispose();
+  }, [bus, deckIndex, framesPerPx]);
 
   return (
     <div className={`wf-lane deck-${deckIndex === 0 ? 'a' : 'b'}`}>
-      <canvas ref={scrollRef} className="wf-scroll" height={90} />
+      <canvas ref={canvasRef} className="wf-scroll" height={90} />
     </div>
   );
 });
