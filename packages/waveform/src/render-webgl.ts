@@ -23,6 +23,7 @@ precision highp float;
 uniform vec2  u_res;          // canvas size (px)
 uniform sampler2D u_tex;      // RGB = low/mid/high band peaks; A = overall amp
 uniform float u_texLen;       // number of peak buckets
+uniform vec2  u_texSize;      // texture dimensions (buckets packed as a 2D grid)
 uniform float u_framesPerBucket;
 uniform float u_positionFrames;
 uniform float u_framesPerPx;
@@ -57,8 +58,13 @@ void main() {
   if (frame >= 0.0) {
     float b = floor(frame / u_framesPerBucket);
     if (b >= 0.0 && b < u_texLen) {
-      float u = (b + 0.5) / u_texLen;
-      vec4 t = texture2D(u_tex, vec2(u, 0.5));            // rgb=bands, a=amp
+      // buckets are packed row-major into a 2D texture (1D would exceed
+      // MAX_TEXTURE_SIZE for long tracks). Recover the (col,row) for bucket b.
+      float tw = u_texSize.x;
+      float col = mod(b, tw);
+      float row = floor(b / tw);
+      vec2 uv = vec2((col + 0.5) / tw, (row + 0.5) / u_texSize.y);
+      vec4 t = texture2D(u_tex, uv);                     // rgb=bands, a=amp
       float amp = t.a;
       float half = amp * mid * 0.92;
       if (abs(y - mid) <= half) {
@@ -162,7 +168,7 @@ export class WaveformGL {
       gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
 
       for (const name of [
-        'u_res', 'u_tex', 'u_texLen', 'u_framesPerBucket',
+        'u_res', 'u_tex', 'u_texLen', 'u_texSize', 'u_framesPerBucket',
         'u_positionFrames', 'u_framesPerPx', 'u_firstBeat', 'u_framesPerBeat',
       ]) {
         this.u[name] = gl.getUniformLocation(prog, name);
@@ -202,7 +208,14 @@ export class WaveformGL {
     const n = peaks.length;
     this.texLen = n;
     this.framesPerBucket = framesPerBucket;
-    const rgba = new Uint8Array(n * 4);
+    // Pack buckets into a 2D texture (a 1D strip of width n overflows
+    // MAX_TEXTURE_SIZE — ~16k — for tracks longer than ~37s, which silently
+    // failed and left the waveform BLANK). Width 2048, height = ceil(n/2048).
+    const tw = 2048;
+    const th = Math.max(1, Math.ceil(n / tw));
+    this.texW = tw;
+    this.texH = th;
+    const rgba = new Uint8Array(tw * th * 4);
     for (let i = 0; i < n; i++) {
       rgba[i * 4 + 0] = low ? low[i]! : peaks[i]!;
       rgba[i * 4 + 1] = mid ? mid[i]! : peaks[i]!;
@@ -211,11 +224,11 @@ export class WaveformGL {
     }
     gl.bindTexture(gl.TEXTURE_2D, this.tex);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-    gl.texImage2D(
-      gl.TEXTURE_2D, 0, gl.RGBA, n, 1, 0,
-      gl.RGBA, gl.UNSIGNED_BYTE, rgba,
-    );
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, tw, th, 0, gl.RGBA, gl.UNSIGNED_BYTE, rgba);
   }
+
+  private texW = 1;
+  private texH = 1;
 
   private framesPerBucket = 1;
 
@@ -243,6 +256,7 @@ export class WaveformGL {
     gl.uniform1i(this.u.u_tex!, 0);
     gl.uniform2f(this.u.u_res!, w, h);
     gl.uniform1f(this.u.u_texLen!, this.texLen);
+    gl.uniform2f(this.u.u_texSize!, this.texW, this.texH);
     gl.uniform1f(this.u.u_framesPerBucket!, this.framesPerBucket);
     gl.uniform1f(this.u.u_positionFrames!, p.positionFrames);
     gl.uniform1f(this.u.u_framesPerPx!, p.framesPerPx);

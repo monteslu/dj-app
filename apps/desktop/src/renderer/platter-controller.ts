@@ -7,12 +7,13 @@
  */
 
 import { deck as deckGroup, DeckKeys, type ControlBus } from '@internal-dj/control-bus';
+import { onFrame } from './frame-loop.js';
 
 const RPM = 33.333;
 const RING_CIRCUMFERENCE = 2 * Math.PI * 46;
 
 export class PlatterController {
-  private raf = 0;
+  private unsub: () => void = () => {};
   private angle = 0;
   private last = performance.now();
   private readonly group: string;
@@ -33,7 +34,7 @@ export class PlatterController {
   ) {
     this.group = deckGroup(deckIndex + 1);
     this.disc.addEventListener('pointerdown', this.onDown);
-    this.raf = requestAnimationFrame(this.tick);
+    this.unsub = onFrame(this.tick);
   }
 
   private centerAngle(e: PointerEvent): number {
@@ -113,11 +114,10 @@ export class PlatterController {
       const pos = this.bus.get(this.group, DeckKeys.playPosition);
       this.ring.style.strokeDashoffset = `${RING_CIRCUMFERENCE * (1 - pos)}`;
     }
-    this.raf = requestAnimationFrame(this.tick);
   };
 
   dispose(): void {
-    cancelAnimationFrame(this.raf);
+    this.unsub();
     this.disc.removeEventListener('pointerdown', this.onDown);
     window.removeEventListener('pointermove', this.onMove);
     window.removeEventListener('pointerup', this.onUp);

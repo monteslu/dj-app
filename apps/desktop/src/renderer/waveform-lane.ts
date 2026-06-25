@@ -9,6 +9,7 @@ import { WaveformGL, drawScrolling, DEFAULT_COLORS } from '@internal-dj/waveform
 import { deck as deckGroup, DeckKeys, MASTER, MasterKeys, type ControlBus } from '@internal-dj/control-bus';
 import { getDeckTrack } from './deck-state.js';
 import { reportLaneDraw } from './perf-monitor.js';
+import { onFrame } from './frame-loop.js';
 
 const SR = 48000;
 // Screen pixels per beat — sets the zoom. Same on every deck, so beats are the
@@ -17,9 +18,10 @@ const SR = 48000;
 const PIXELS_PER_BEAT = 64;
 
 export class WaveformLaneController {
-  private gl: WaveformGL;
+  private gl: WaveformGL | null = null;
+  private readonly useGl: boolean;
   private uploaded: Uint8Array | null = null;
-  private raf = 0;
+  private unsub: () => void = () => {};
   private ro: ResizeObserver;
   private readonly group: string;
 
@@ -30,14 +32,18 @@ export class WaveformLaneController {
     private readonly framesPerPx: number,
   ) {
     this.group = deckGroup(deckIndex + 1);
-    this.gl = new WaveformGL(canvas);
+    // WebGL is opt-in (?gl) for now: a canvas can only be GL OR 2D, and the
+    // Canvas2D path is the verified-working default. Once the GL texture path is
+    // confirmed on real hardware this flips back to the default.
+    this.useGl = new URLSearchParams(location.search).has('gl');
+    if (this.useGl) this.gl = new WaveformGL(canvas);
 
     // size the backing store on real resize only (not per frame)
     this.ro = new ResizeObserver(() => this.fit());
     this.fit();
     this.ro.observe(canvas);
 
-    this.raf = requestAnimationFrame(this.tick);
+    this.unsub = onFrame(this.tick);
   }
 
   private fit(): void {
@@ -51,7 +57,7 @@ export class WaveformLaneController {
       // upload peaks to the GPU only when the track changes
       if (this.uploaded !== st.peaks.detail.peaks) {
         const d = st.peaks.detail;
-        this.gl.setPeaks(d.peaks, d.framesPerBucket, d.low, d.mid, d.high);
+        this.gl?.setPeaks(d.peaks, d.framesPerBucket, d.low, d.mid, d.high);
         this.uploaded = d.peaks;
       }
       const g = this.group;
@@ -83,21 +89,22 @@ export class WaveformLaneController {
         framesPerBeat,
       };
       const t0 = performance.now();
-      if (this.gl.ok) {
+      if (this.useGl && this.gl?.ok) {
         this.gl.draw(params);
       } else {
-        // Canvas2D fallback only when WebGL is unavailable.
+        // Canvas2D path (the default — proven to render + fast at <1ms/frame;
+        // WebGL is opt-in via ?gl while its texture path is verified on hardware).
         drawScrolling(this.canvas, st.peaks.detail, params.positionFrames, framesPerPx, DEFAULT_COLORS, {
           firstBeatFrame: params.firstBeatFrame,
           framesPerBeat,
         });
       }
-      reportLaneDraw(`deck${this.deckIndex}`, this.gl.ok, performance.now() - t0);
+      reportLaneDraw(`deck${this.deckIndex}`, !!this.gl?.ok, performance.now() - t0);
     } else {
       // no track → paint the panel grey so the band never shows white (a WebGL
       // canvas paints its framebuffer OVER the CSS bg; an undrawn/failed one is
       // white). GL path clears to grey; the Canvas2D fallback fills grey.
-      if (this.gl.ok) {
+      if (this.useGl && this.gl?.ok) {
         this.gl.clear();
       } else {
         const ctx = this.canvas.getContext('2d');
@@ -108,12 +115,11 @@ export class WaveformLaneController {
       }
       this.uploaded = null;
     }
-    this.raf = requestAnimationFrame(this.tick);
   };
 
   dispose(): void {
-    cancelAnimationFrame(this.raf);
+    this.unsub();
     this.ro.disconnect();
-    this.gl.dispose();
+    this.gl?.dispose();
   }
 }

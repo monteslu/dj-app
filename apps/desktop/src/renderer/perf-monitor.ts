@@ -5,6 +5,8 @@
  * lanes are drawing. Enabled always in dev; cheap (just timestamps per frame).
  */
 
+import { onFrame } from './frame-loop.js';
+
 let started = false;
 
 interface LaneStat {
@@ -64,7 +66,6 @@ export function startPerfMonitor(intervalSec = 3): void {
       longFrames = 0;
       jankFrames = 0;
     }
-    requestAnimationFrame(tick);
   };
-  requestAnimationFrame(tick);
+  onFrame(tick);
 }

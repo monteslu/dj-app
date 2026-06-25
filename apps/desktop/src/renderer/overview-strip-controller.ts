@@ -14,6 +14,7 @@ import {
   type ControlBus,
 } from '@internal-dj/control-bus';
 import { getDeckTrack } from './deck-state.js';
+import { onFrame } from './frame-loop.js';
 
 const HOTCUE_COLORS = ['#ff5a5a', '#ffb84d', '#4ade80', '#37b6ff', '#a78bfa', '#f472b6', '#42d4f4', '#f2f2ff'];
 
@@ -34,7 +35,7 @@ export function collectHotcueMarkers(
 }
 
 export class OverviewStripController {
-  private raf = 0;
+  private unsub: () => void = () => {};
   private ro: ResizeObserver;
   private readonly group: string;
 
@@ -47,7 +48,7 @@ export class OverviewStripController {
     this.ro = new ResizeObserver(() => this.fit());
     this.fit();
     this.ro.observe(canvas);
-    this.raf = requestAnimationFrame(this.tick);
+    this.unsub = onFrame(this.tick);
   }
 
   private fit(): void {
@@ -70,11 +71,10 @@ export class OverviewStripController {
         ctx.fillRect(0, 0, c.width, c.height);
       }
     }
-    this.raf = requestAnimationFrame(this.tick);
   };
 
   dispose(): void {
-    cancelAnimationFrame(this.raf);
+    this.unsub();
     this.ro.disconnect();
   }
 }

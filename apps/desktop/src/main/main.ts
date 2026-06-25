@@ -33,26 +33,21 @@ const isDev = process.argv.includes('--dev');
 app.setName('dj-app');
 
 // On Linux/Wayland some drivers crash-loop in Chromium's native-GPU-buffer
-// (GBM/pixmap) raster path — "eglCreateImage failed", "OzoneImageBacking ... GPU
-// process exited unexpectedly" — which pegs the frame rate to ~30fps with huge
-// spikes (measured: our own waveform draw is <1ms; the rest is the GPU process
-// restarting). This is a COMPOSITOR-RASTER issue, NOT our WebGL/WebGPU rendering.
-// All switches below are verified present in the bundled Chromium binary:
-//   --disable-gpu-memory-buffer-compositor-resources : stop using GBM/SharedImage
-//        backing for compositor tiles (the OzoneImageBacking path that crashes)
-//   --disable-features=CanvasOopRasterization : route 2D canvas raster off the
-//        out-of-process SharedImage path that's failing
-// These keep GPU acceleration + WebGPU; they do NOT force a GL backend. Opt out
-// with DJ_NATIVE_GPU=1.
+// (GBM/pixmap) path — "eglCreateImage failed", "OzoneImageBacking ... GPU process
+// exited unexpectedly". The crash is the native-pixmap IMPORT for sharing GPU
+// buffers with the Wayland compositor; disabling NATIVE GPU memory buffers makes
+// Chromium use a shared-memory copy path instead, which keeps GPU rendering +
+// WebGL/WebGPU working AND stops the crash. (Verified switches; do NOT force a GL
+// backend.) Opt out with DJ_NATIVE_GPU=1.
 if (process.platform === 'linux' && process.env.DJ_NATIVE_GPU !== '1') {
+  // The crash is OzoneImageBacking::ProduceSkiaGanesh — Chromium's GPU
+  // RASTERIZATION producing a Skia-on-GPU tile that fails on this driver's
+  // native-pixmap import. --disable-gpu-rasterization rasters tiles on the CPU
+  // while keeping COMPOSITING + WebGL/WebGPU on the GPU — surgical (unlike
+  // --disable-gpu-compositing, which breaks the WebGL canvas). All verified
+  // switches present in the binary. Opt out with DJ_NATIVE_GPU=1.
+  app.commandLine.appendSwitch('disable-gpu-rasterization');
   app.commandLine.appendSwitch('disable-gpu-memory-buffer-compositor-resources');
-  app.commandLine.appendSwitch('disable-features', 'CanvasOopRasterization');
-  // The memory-buffer switches alone DON'T stop the crash on this driver (the
-  // OzoneImageBacking failure is deeper). --disable-gpu-compositing moves the UI
-  // COMPOSITING to the CPU, bypassing the broken native-pixmap/SharedImage path
-  // entirely. Our WebGL waveform still runs on the GPU; only the page compositor
-  // changes. This is the reliable stop for the crash-loop. (Verified switch.)
-  app.commandLine.appendSwitch('disable-gpu-compositing');
 }
 
 // NOTE: the Wayland-vs-X11 display backend is selected via the

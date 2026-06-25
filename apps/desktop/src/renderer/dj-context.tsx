@@ -21,6 +21,7 @@ import { Engine } from '@internal-dj/audio-engine';
 import { AnalysisService } from './analysis-service.js';
 import { AnalysisQueue } from './analysis-queue.js';
 import { startPerfMonitor } from './perf-monitor.js';
+import { onFrame } from './frame-loop.js';
 import { ControllerService } from './controller-service.js';
 import { RecordingService } from './recording-service.js';
 
@@ -114,13 +115,9 @@ export function DjProvider({ children }: { children: ReactNode }): React.JSX.Ele
   // frozen even when audio is running. The generation check makes it cheap.
   useEffect(() => {
     startPerfMonitor(3); // logs FPS + frame timing every 3s
-    let raf = 0;
-    const pump = () => {
-      runtime.bus.syncFromSab();
-      raf = requestAnimationFrame(pump);
-    };
-    raf = requestAnimationFrame(pump);
-    return () => cancelAnimationFrame(raf);
+    // SAB readback runs FIRST each frame on the shared loop, so the values the
+    // waveform/meters read are this-frame fresh.
+    return onFrame(() => runtime.bus.syncFromSab());
   }, [runtime]);
 
   useEffect(() => {
