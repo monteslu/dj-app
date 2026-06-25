@@ -134,27 +134,41 @@ export function drawOverview(
  * the waveform reads as colorful + alive rather than a flat monochrome block.
  * `played` dims/desaturates the already-played portion.
  */
-function ampColor(amp01: number, played: boolean): string {
-  // low → teal/blue, mid → green, high → warm
-  let r: number, g: number, b: number;
-  if (amp01 < 0.5) {
-    const t = amp01 / 0.5;
-    r = 30 + t * 20;
-    g = 120 + t * 110;
-    b = 220 - t * 90;
-  } else {
-    const t = (amp01 - 0.5) / 0.5;
-    r = 50 + t * 200;
-    g = 230 - t * 60;
-    b = 130 - t * 90;
+// Precomputed color palette (built once). Changing ctx.fillStyle per pixel +
+// allocating an rgb() string per pixel was the cause of choppy waveform playback
+// (~1000 string allocs + 1000 GPU state flushes per frame). Instead we quantize
+// amplitude into PALETTE_N buckets, look up a cached color string, and BATCH all
+// columns of the same color into one fill pass — turning ~1000 fillStyle changes
+// per frame into ~PALETTE_N.
+const PALETTE_N = 48;
+
+function buildPalette(played: boolean): string[] {
+  const pal: string[] = new Array(PALETTE_N);
+  for (let i = 0; i < PALETTE_N; i++) {
+    const amp01 = i / (PALETTE_N - 1);
+    let r: number, g: number, b: number;
+    if (amp01 < 0.5) {
+      const t = amp01 / 0.5;
+      r = 30 + t * 20;
+      g = 120 + t * 110;
+      b = 220 - t * 90;
+    } else {
+      const t = (amp01 - 0.5) / 0.5;
+      r = 50 + t * 200;
+      g = 230 - t * 60;
+      b = 130 - t * 90;
+    }
+    if (played) {
+      r *= 0.45;
+      g *= 0.45;
+      b *= 0.45;
+    }
+    pal[i] = `rgb(${r | 0},${g | 0},${b | 0})`;
   }
-  if (played) {
-    r *= 0.45;
-    g *= 0.45;
-    b *= 0.45;
-  }
-  return `rgb(${r | 0},${g | 0},${b | 0})`;
+  return pal;
 }
+const PALETTE_LIVE = /* @__PURE__ */ buildPalette(false);
+const PALETTE_PLAYED = /* @__PURE__ */ buildPalette(true);
 
 export interface ScrollOverlay {
   /** Beat grid: frame of the first beat + frames per beat (0 = no grid). */
@@ -209,16 +223,29 @@ export function drawScrolling(
     }
   }
 
-  // waveform columns, colored by amplitude, dimmed when played
+  // waveform columns, colored by amplitude, dimmed when played. ONE pass builds a
+  // Path2D per palette bucket (×2 for played/live), then each bucket is filled in
+  // a single fill() call — so fillStyle changes drop from ~1000/frame to ~96, and
+  // there are zero per-pixel string allocations. This is what fixes choppy
+  // playback.
+  const paths: Path2D[] = [];
+  for (let i = 0; i < PALETTE_N * 2; i++) paths.push(new Path2D());
   for (let x = 0; x < w; x++) {
     const frame = positionFrames + (x - centerX) * framesPerPx;
     if (frame < 0) continue;
     const b = Math.floor(frame / framesPerBucket);
     if (b >= length) break;
-    const amp01 = peaks[b]! / 255;
-    const amp = amp01 * mid * 0.92;
-    ctx.fillStyle = ampColor(amp01, x < centerX);
-    ctx.fillRect(x, mid - amp, 1, amp * 2);
+    const v = peaks[b]!;
+    const amp = (v / 255) * mid * 0.92;
+    const bucket = ((v / 255) * (PALETTE_N - 1)) | 0;
+    const played = x < centerX ? 1 : 0;
+    paths[bucket * 2 + played]!.rect(x, mid - amp, 1, amp * 2);
+  }
+  for (let p = 0; p < PALETTE_N; p++) {
+    ctx.fillStyle = PALETTE_LIVE[p]!;
+    ctx.fill(paths[p * 2]!);
+    ctx.fillStyle = PALETTE_PLAYED[p]!;
+    ctx.fill(paths[p * 2 + 1]!);
   }
 
   // center playhead — glowing line

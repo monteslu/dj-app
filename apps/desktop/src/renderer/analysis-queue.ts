@@ -10,7 +10,6 @@
  */
 
 import { decodeArrayBuffer } from '@internal-dj/codec';
-import { computePeakSet, detailBucketsForDuration } from '@internal-dj/waveform';
 import type { Engine } from '@internal-dj/audio-engine';
 import type { AnalysisService } from './analysis-service.js';
 
@@ -109,20 +108,15 @@ export class AnalysisQueue {
     if (!ctx) return; // engine not started yet; will retry next enqueue
     const decoded = await decodeArrayBuffer(ctx, file.data, file.name);
 
-    const all = new Float32Array(decoded.sampleBuffer);
-    const channels: Float32Array[] = [];
-    for (let c = 0; c < decoded.channels; c++) {
-      channels.push(all.subarray(c * decoded.frames, (c + 1) * decoded.frames));
-    }
-    const dur = decoded.frames / decoded.sampleRate;
-    const peaks = computePeakSet(channels, decoded.frames, detailBucketsForDuration(dur));
-    const r = await this.analysis.analyze(decoded);
+    // Everything heavy (peaks + beat + key) happens IN THE WORKER, off the main
+    // thread, so background analysis never hiccups live audio.
+    const r = await this.analysis.analyze(decoded, /* computePeaks */ true);
 
     await window.dj.librarySetAnalysis(id, {
       bpm: r.bpm,
       firstBeatFrame: r.firstBeatFrame,
       key: r.camelot,
-      waveform: peaks.overview.peaks,
+      waveform: r.overviewPeaks,
       analyzedAt: Date.now(),
     });
   }

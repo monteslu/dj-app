@@ -13,6 +13,10 @@ export interface BeatGridResult {
   confidence: number;
   key: string;
   camelot: string;
+  /** Overview peaks, when peaks were requested (computed in the worker). */
+  overviewPeaks?: Uint8Array;
+  detailPeaks?: Uint8Array;
+  detailFramesPerBucket?: number;
 }
 
 export class AnalysisService {
@@ -37,13 +41,21 @@ export class AnalysisService {
             confidence: msg.confidence,
             key: msg.key,
             camelot: msg.camelot,
+            overviewPeaks: msg.overviewPeaks,
+            detailPeaks: msg.detailPeaks,
+            detailFramesPerBucket: msg.detailFramesPerBucket,
           });
         }
       }
     };
   }
 
-  analyze(track: DecodedTrack): Promise<BeatGridResult> {
+  /**
+   * Analyze a track in the worker. Pass `computePeaks` to also build the waveform
+   * peaks off the main thread (used by the background queue so nothing heavy runs
+   * on the main/audio path).
+   */
+  analyze(track: DecodedTrack, computePeaks = false): Promise<BeatGridResult> {
     const id = this.nextId++;
     const req: AnalyzeRequest = {
       type: 'analyze',
@@ -52,6 +64,7 @@ export class AnalysisService {
       channels: track.channels,
       frames: track.frames,
       sampleRate: track.sampleRate,
+      computePeaks,
     };
     return new Promise<BeatGridResult>((resolve) => {
       this.pending.set(id, resolve);

@@ -182,32 +182,17 @@ export function Deck({ deckIndex, side = 'left' }: Props): React.JSX.Element {
     setPlay(play > 0.5 ? 0 : 1);
   }, [started, start, play, setPlay, engine]);
 
-  // CUE (CDJ-style):
-  //  - playing → jump back to the cue point and stop (so you can re-launch)
-  //  - stopped → set the cue point to the current position
-  // The temporary cue point defaults to the track start until you set one.
+  // CUE (CDJ-style), one clear behavior per click:
+  //  - PLAYING  → jump back to the cue point and stop (ready to re-launch)
+  //  - STOPPED  → set the cue point to the current position
+  // The cue point defaults to the track start on load, so CUE always works.
   const cue = useCallback(() => {
     if (play > 0.5) {
-      // jump to cue + stop (cue_gotoandstop trigger on the CueControl)
       bus.set(grp, DeckKeys.cueGotoAndStop, 1);
     } else {
-      // set the cue point here (cue_set)
       bus.set(grp, DeckKeys.cueSet, 1);
     }
   }, [play, bus, grp]);
-
-  // Hold to preview from the cue point (plays while held, returns on release).
-  const cuePreview = useCallback(() => {
-    if (play > 0.5) return; // only previews when stopped
-    bus.set(grp, DeckKeys.cueGotoAndStop, 1); // ensure we're at the cue
-    setPlay(1);
-    const release = () => {
-      setPlay(0);
-      bus.set(grp, DeckKeys.cueGotoAndStop, 1);
-      window.removeEventListener('pointerup', release);
-    };
-    window.addEventListener('pointerup', release);
-  }, [play, bus, grp, setPlay]);
 
   // Temporary pitch bend: while held, add a small offset to the rate slider; on
   // release, restore. For manual beatmatching (nudge a deck into phase).
@@ -279,9 +264,8 @@ export function Deck({ deckIndex, side = 'left' }: Props): React.JSX.Element {
         <button
           className="cue-btn"
           onClick={cue}
-          onPointerDown={cuePreview}
           disabled={!trackLoaded}
-          title="CUE: when stopped, sets the cue point here (hold to preview from it). When playing, jumps back to the cue point and stops."
+          title="CUE — playing: jump back to the cue point and stop. Stopped: set the cue point here."
         >
           CUE
         </button>

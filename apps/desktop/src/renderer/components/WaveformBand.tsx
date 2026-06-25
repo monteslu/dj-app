@@ -6,46 +6,56 @@
  * via rAF onto canvases (no React re-render per frame).
  */
 
-import { useEffect, useRef } from 'react';
+import { memo, useEffect, useRef } from 'react';
 import { drawScrolling, DEFAULT_COLORS } from '@internal-dj/waveform';
 import { deck as deckGroup, DeckKeys } from '@internal-dj/control-bus';
 import { useDj } from '../dj-context.js';
 import { getDeckTrack } from '../deck-state.js';
 
-function DeckLane({ deckIndex, framesPerPx }: { deckIndex: number; framesPerPx: number }): React.JSX.Element {
+const DeckLane = memo(function DeckLane({
+  deckIndex,
+  framesPerPx,
+}: {
+  deckIndex: number;
+  framesPerPx: number;
+}): React.JSX.Element {
   const { bus } = useDj();
   const scrollRef = useRef<HTMLCanvasElement>(null);
   const g = deckGroup(deckIndex + 1);
 
+  // Size the canvas backing store only when the element actually resizes (via a
+  // ResizeObserver), NOT every frame — reading getBoundingClientRect + setting
+  // canvas.width per rAF forces a layout reflow + clears the canvas, which causes
+  // the choppiness. Setting .width also resets the context, so do it sparingly.
+  useEffect(() => {
+    const c = scrollRef.current;
+    if (!c) return;
+    const fit = () => {
+      const w = Math.floor(c.clientWidth);
+      if (w && c.width !== w) c.width = w;
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(c);
+    return () => ro.disconnect();
+  }, []);
+
   useEffect(() => {
     let raf = 0;
-    const resize = () => {
-      const c = scrollRef.current;
-      if (c) {
-        const r = c.getBoundingClientRect();
-        if (r.width && c.width !== Math.floor(r.width)) c.width = Math.floor(r.width);
-      }
-    };
     const tick = () => {
-      resize();
-      const st = getDeckTrack(deckIndex);
-      const frames = bus.get(g, DeckKeys.trackSamples);
-      const fraction = bus.get(g, DeckKeys.playPosition);
-      const positionFrames = fraction * frames;
-      const fileBpm = bus.get(g, DeckKeys.fileBpm);
-      const framesPerBeat = fileBpm > 0 ? (60 / fileBpm) * 48000 : 0;
-
-      if (scrollRef.current && st.peaks) {
-        const fbf = bus.get(g, DeckKeys.firstBeatFrame);
-        drawScrolling(scrollRef.current, st.peaks.detail, positionFrames, framesPerPx, DEFAULT_COLORS, {
-          firstBeatFrame: fbf >= 0 ? fbf : 0,
-          framesPerBeat,
-        });
-      } else if (scrollRef.current) {
-        const ctx = scrollRef.current.getContext('2d');
-        if (ctx) {
-          ctx.fillStyle = '#080b10';
-          ctx.fillRect(0, 0, scrollRef.current.width, scrollRef.current.height);
+      const canvas = scrollRef.current;
+      if (canvas) {
+        const st = getDeckTrack(deckIndex);
+        if (st.peaks) {
+          const frames = bus.get(g, DeckKeys.trackSamples);
+          const fraction = bus.get(g, DeckKeys.playPosition);
+          const fileBpm = bus.get(g, DeckKeys.fileBpm);
+          const framesPerBeat = fileBpm > 0 ? (60 / fileBpm) * 48000 : 0;
+          const fbf = bus.get(g, DeckKeys.firstBeatFrame);
+          drawScrolling(canvas, st.peaks.detail, fraction * frames, framesPerPx, DEFAULT_COLORS, {
+            firstBeatFrame: fbf >= 0 ? fbf : 0,
+            framesPerBeat,
+          });
         }
       }
       raf = requestAnimationFrame(tick);
@@ -59,7 +69,7 @@ function DeckLane({ deckIndex, framesPerPx }: { deckIndex: number; framesPerPx: 
       <canvas ref={scrollRef} className="wf-scroll" height={90} />
     </div>
   );
-}
+});
 
 export function WaveformBand(): React.JSX.Element {
   return (

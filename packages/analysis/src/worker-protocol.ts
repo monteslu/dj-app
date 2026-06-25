@@ -12,6 +12,10 @@ export interface AnalyzeRequest {
   channels: number;
   frames: number;
   sampleRate: number;
+  /** If set, also compute the waveform peak set in the worker (off main thread). */
+  computePeaks?: boolean;
+  /** Detail bucket count for the peak set (overview count is fixed). */
+  detailBuckets?: number;
 }
 
 export interface AnalyzeResponse {
@@ -24,4 +28,9 @@ export interface AnalyzeResponse {
   key: string;
   /** Camelot code, e.g. "8A". */
   camelot: string;
+  /** Overview peaks (Uint8 per bucket), if computePeaks was requested. */
+  overviewPeaks?: Uint8Array;
+  /** Detail peaks, if computePeaks was requested. */
+  detailPeaks?: Uint8Array;
+  detailFramesPerBucket?: number;
 }

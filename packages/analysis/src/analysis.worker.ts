@@ -7,6 +7,7 @@
 /// <reference lib="webworker" />
 
 import { WasmBeatDetector } from '@internal-dj/dsp-wasm';
+import { computePeakSet, detailBucketsForDuration } from '@internal-dj/waveform';
 import { detectKey } from './key-detector.js';
 import type { AnalyzeRequest, AnalyzeResponse } from './worker-protocol.js';
 
@@ -36,5 +37,17 @@ self.onmessage = (e: MessageEvent<AnalyzeRequest>) => {
     key: k.name,
     camelot: k.camelot,
   };
+
+  // Compute the waveform peaks here too (off the main thread) when asked, so the
+  // background analysis path does ALL its heavy work in the worker — no main-
+  // thread sample loops that would hiccup live audio.
+  if (msg.computePeaks) {
+    const buckets = msg.detailBuckets ?? detailBucketsForDuration(msg.frames / msg.sampleRate);
+    const peaks = computePeakSet(channels, msg.frames, buckets);
+    res.overviewPeaks = peaks.overview.peaks;
+    res.detailPeaks = peaks.detail.peaks;
+    res.detailFramesPerBucket = peaks.detail.framesPerBucket;
+  }
+
   self.postMessage(res);
 };

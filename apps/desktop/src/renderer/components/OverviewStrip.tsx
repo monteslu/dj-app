@@ -23,13 +23,25 @@ export function OverviewStrip({ deckIndex }: { deckIndex: number }): React.JSX.E
   const ref = useRef<HTMLCanvasElement>(null);
   const g = deckGroup(deckIndex + 1);
 
+  // Size the canvas only on real resize (not per frame — that reflows + clears).
+  useEffect(() => {
+    const c = ref.current;
+    if (!c) return;
+    const fit = () => {
+      const w = Math.floor(c.clientWidth);
+      if (w && c.width !== w) c.width = w;
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(c);
+    return () => ro.disconnect();
+  }, []);
+
   useEffect(() => {
     let raf = 0;
     const tick = () => {
       const c = ref.current;
       if (c) {
-        const r = c.getBoundingClientRect();
-        if (r.width && c.width !== Math.floor(r.width)) c.width = Math.floor(r.width);
         const st = getDeckTrack(deckIndex);
         const frames = bus.get(g, DeckKeys.trackSamples);
         const fraction = bus.get(g, DeckKeys.playPosition);

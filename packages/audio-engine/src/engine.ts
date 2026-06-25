@@ -400,6 +400,10 @@ export class Engine {
     this.bus.set(g, DeckKeys.duration, track.frames / track.sampleRate);
     this.bus.set(g, DeckKeys.trackSamples, track.frames);
     this.bus.set(g, DeckKeys.trackLoaded, 1);
+    // Default the cue point to the track start so CUE always has a target (CDJ
+    // behavior). A user CUE-set while stopped overrides it.
+    this.bus.set(g, DeckKeys.cuePoint, 0);
+    this.bus.set(g, DeckKeys.playPosition, 0);
     if (track.bpm) {
       this.bus.set(g, DeckKeys.fileBpm, track.bpm);
     }
