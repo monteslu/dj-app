@@ -41,3 +41,27 @@ export function applyConsoleHeight(app: HTMLElement): void {
     app.style.removeProperty('--console-h');
   }
 }
+
+/**
+ * Begin a splitter drag: resize the console (decks) vs library by dragging.
+ * Writes --console-h live, persists the final size. Returns nothing — wires its
+ * own global pointer listeners and cleans them up on release. The interaction
+ * logic lives here (not in the JSX), paired with the persistence above.
+ */
+export function startConsoleResize(app: HTMLElement, capture?: (id: number) => void, pointerId?: number): void {
+  if (pointerId != null) capture?.(pointerId);
+  let lastH = 0;
+  const move = (ev: PointerEvent) => {
+    const rect = app.getBoundingClientRect();
+    const top = app.querySelector('.waveform-band')?.getBoundingClientRect().bottom ?? rect.top;
+    lastH = Math.max(140, Math.min(rect.bottom - 120, ev.clientY) - top);
+    app.style.setProperty('--console-h', `${lastH}px`);
+  };
+  const up = () => {
+    if (lastH > 0) setConsoleHeight(lastH);
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', up);
+  };
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
+}

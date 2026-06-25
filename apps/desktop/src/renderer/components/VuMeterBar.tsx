@@ -4,9 +4,15 @@
  * avoiding per-frame React re-renders.
  */
 
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import { deck as deckGroup, DeckKeys } from '@internal-dj/control-bus';
 import { useDj } from '../dj-context.js';
+import { useBusRaf } from '../use-bus-raf.js';
+
+/** sqrt scaling lifts low levels into view (perceptual-ish). 0..1 → 0..100%. */
+export function vuFillPercent(level: number): number {
+  return Math.min(100, Math.sqrt(level) * 100);
+}
 
 export function VuMeterBar({ deckIndex }: { deckIndex: number }): React.JSX.Element {
   const { bus } = useDj();
@@ -14,24 +20,12 @@ export function VuMeterBar({ deckIndex }: { deckIndex: number }): React.JSX.Elem
   const clipRef = useRef<HTMLDivElement>(null);
   const g = deckGroup(deckIndex + 1);
 
-  useEffect(() => {
-    let raf = 0;
-    const tick = () => {
-      const level = bus.get(g, DeckKeys.vuMeter);
-      const clip = bus.get(g, DeckKeys.peakIndicator) > 0.5;
-      if (fillRef.current) {
-        // Perceptual-ish scaling: sqrt lifts low levels into view.
-        const h = Math.min(100, Math.sqrt(level) * 100);
-        fillRef.current.style.height = `${h}%`;
-      }
-      if (clipRef.current) {
-        clipRef.current.style.opacity = clip ? '1' : '0';
-      }
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [bus, g]);
+  useBusRaf(() => {
+    const level = bus.get(g, DeckKeys.vuMeter);
+    const clip = bus.get(g, DeckKeys.peakIndicator) > 0.5;
+    if (fillRef.current) fillRef.current.style.height = `${vuFillPercent(level)}%`;
+    if (clipRef.current) clipRef.current.style.opacity = clip ? '1' : '0';
+  });
 
   return (
     <div className="vu-meter" aria-label={`Deck ${deckIndex + 1} level`}>

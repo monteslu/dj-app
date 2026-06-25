@@ -13,7 +13,7 @@ import { AudioSettings } from './components/AudioSettings.js';
 import { TempoFader } from './components/Faders.js';
 import { WaveformBand } from './components/WaveformBand.js';
 import { useLayoutControls, applyPrefs, getPrefs } from './layout-prefs.js';
-import { setConsoleHeight, clearConsoleHeight, applyConsoleHeight } from './panel-sizes.js';
+import { startConsoleResize, clearConsoleHeight, applyConsoleHeight } from './panel-sizes.js';
 import { isDemo, seedDemo } from './demo.js';
 
 /**
@@ -27,22 +27,8 @@ function Splitter(): React.JSX.Element {
     e.preventDefault();
     const app = (e.currentTarget as HTMLElement).closest('.app') as HTMLElement | null;
     if (!app) return;
-    (e.currentTarget as Element).setPointerCapture(e.pointerId);
-    let lastH = 0;
-    const move = (ev: PointerEvent) => {
-      const rect = app.getBoundingClientRect();
-      // console height = pointer position minus the rows above (titlebar+waveband).
-      const top = app.querySelector('.waveform-band')?.getBoundingClientRect().bottom ?? rect.top;
-      lastH = Math.max(140, Math.min(rect.bottom - 120, ev.clientY) - top);
-      app.style.setProperty('--console-h', `${lastH}px`);
-    };
-    const up = () => {
-      if (lastH > 0) setConsoleHeight(lastH); // persist the final size
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
-    };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
+    const el = e.currentTarget as Element;
+    startConsoleResize(app, (id) => el.setPointerCapture(id), e.pointerId);
   };
   const reset = (e: React.MouseEvent) => {
     const app = (e.currentTarget as HTMLElement).closest('.app') as HTMLElement | null;
