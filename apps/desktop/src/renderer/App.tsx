@@ -10,6 +10,7 @@ import { Deck } from './components/Deck.js';
 import { Mixer } from './components/Mixer.js';
 import { Library } from './components/Library.js';
 import { AudioSettings } from './components/AudioSettings.js';
+import { ControllerSettings } from './components/ControllerSettings.js';
 import { TempoFader } from './components/Faders.js';
 import { WaveformBand } from './components/WaveformBand.js';
 import { useLayoutControls, applyPrefs, getPrefs } from './layout-prefs.js';
@@ -87,6 +88,7 @@ function RecordButton(): React.JSX.Element {
 function Stage(): React.JSX.Element {
   const { started, start, bus } = useDj();
   const [showAudio, setShowAudio] = useState(false);
+  const [showMidi, setShowMidi] = useState(false);
   const { prefs, toggleDensity, setPreset } = useLayoutControls();
 
   // Apply saved layout prefs to the .app element on mount. A ?layout=/?density=
@@ -143,6 +145,9 @@ function Stage(): React.JSX.Element {
           </button>
         </div>
         <RecordButton />
+        <button className="tiny" onClick={() => setShowMidi(true)} title="MIDI controllers">
+          🎛 MIDI
+        </button>
         <button className="tiny audio-routing-btn" onClick={() => setShowAudio(true)}>
           🔊 audio routing
         </button>
@@ -153,6 +158,7 @@ function Stage(): React.JSX.Element {
         )}
       </div>
       {showAudio && <AudioSettings onClose={() => setShowAudio(false)} />}
+      {showMidi && <ControllerSettings onClose={() => setShowMidi(false)} />}
       <WaveformBand />
       <main className="console">
         <TempoFader deckIndex={0} side="left" />
