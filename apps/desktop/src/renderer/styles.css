@@ -246,12 +246,17 @@ body,
   background: linear-gradient(180deg, var(--panel), var(--bg-2));
   border: 1px solid var(--edge);
   border-radius: var(--radius);
-  padding: 12px 14px;
+  padding: calc(12px * var(--u)) calc(14px * var(--u));
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: var(--gap);
   min-width: 0;
   min-height: 0;
+  /* container query context: the deck reflows based on ITS OWN width, not the
+     viewport — so a narrow deck stacks the platter above the info, etc. This is
+     the web-native win Mixxx's fixed skins can't do. */
+  container-type: inline-size;
+  container-name: deck;
   /* scroll the deck's own controls when the console is short, instead of
      clipping them out of reach (the bug: controls vanished at low height). */
   overflow-y: auto;
@@ -282,8 +287,30 @@ body,
 /* deck top: platter + track info side by side */
 .deck-top {
   display: flex;
-  gap: 12px;
+  gap: calc(12px * var(--u));
   align-items: center;
+}
+
+/* container-query reflow: when a deck is narrow, stack platter above the info
+   and center it, so a squeezed deck stays readable instead of overflowing. */
+@container deck (max-width: 320px) {
+  .deck-top {
+    flex-direction: column;
+    align-items: stretch;
+    gap: calc(6px * var(--u));
+  }
+  .platter {
+    align-self: center;
+  }
+  .hotcue-row {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+/* when a deck is generously wide, the hotcues can go 8-across in one row */
+@container deck (min-width: 520px) {
+  .hotcue-row {
+    grid-template-columns: repeat(8, 1fr);
+  }
 }
 .platter {
   position: relative;
@@ -720,7 +747,9 @@ body,
   background: linear-gradient(180deg, var(--panel-2), var(--bg-2));
   border: 1px solid var(--edge);
   border-radius: var(--radius);
-  padding: 8px 8px 10px;
+  padding: calc(8px * var(--u)) calc(8px * var(--u)) calc(10px * var(--u));
+  container-type: inline-size;
+  container-name: mixer;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -797,6 +826,24 @@ body,
   flex: 0 0 auto;
   height: var(--fader-h);
   width: var(--fader-w);
+}
+
+/* mixer reflow: when the center column is tight, drop the per-channel faders
+   (volume still lives on the deck-less strip via the crossfader + gain) so the
+   EQ knobs stay full-size and usable rather than everything shrinking to mush. */
+@container mixer (max-width: 200px) {
+  .chan-fader {
+    display: none;
+  }
+  .mixer-vus {
+    display: none;
+  }
+}
+/* roomy mixer: a touch more breathing room between the strips */
+@container mixer (min-width: 280px) {
+  .mixer-strips {
+    gap: calc(14px * var(--u));
+  }
 }
 /* center VU meters between the strips; bottom-aligned so they line up with the
    bottoms of the channel faders regardless of the PFL/knob row heights. */
