@@ -15,7 +15,18 @@
  *     are not hot; correctness + no WASM leaks beats statement caching here).
  */
 
-import { Database as WasmDatabase } from 'node-sqlite3-wasm';
+// node-sqlite3-wasm is a CommonJS module kept external in the (ESM) main bundle.
+// Node's ESM loader exposes neither its named exports (`import { Database }`) nor
+// its namespace (`import * as`) — both yield undefined / throw at load. A true CJS
+// `require` via createRequire is the only form that resolves `.Database` at
+// runtime (verified against the real Node ESM loader). esbuild already injects a
+// createRequire in the ESM main bundle, so import.meta.url is valid here.
+import { createRequire } from 'node:module';
+import { mkdirSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+const nodeRequire = createRequire(import.meta.url);
+const { Database: WasmDatabase } = nodeRequire('node-sqlite3-wasm') as typeof import('node-sqlite3-wasm');
+type WasmDatabase = import('node-sqlite3-wasm').Database;
 
 export type BindParams = unknown[] | Record<string, unknown>;
 type Row = Record<string, unknown>;
@@ -84,7 +95,25 @@ export class SqliteDb {
   readonly inner: WasmDatabase;
 
   constructor(path: string) {
-    this.inner = new WasmDatabase(path);
+    // node-sqlite3-wasm won't create the DB file if its parent dir is missing
+    // (better-sqlite3 did). Ensure the directory exists first — matters on a
+    // fresh machine before Electron's userData dir has been created. Also
+    // normalize to an absolute path: the WASM module resolves relative paths
+    // against process.cwd(), which is unreliable in a packaged app.
+    const isMemory = path === ':memory:' || path.startsWith('file::memory:');
+    const dbPath = isMemory ? path : resolve(path);
+    if (!isMemory) {
+      try {
+        mkdirSync(dirname(dbPath), { recursive: true });
+      } catch {
+        /* dir already exists or path has no dir component */
+      }
+    }
+    try {
+      this.inner = new WasmDatabase(dbPath);
+    } catch (e) {
+      throw new Error(`SqliteDb: failed to open database at "${dbPath}": ${String(e)}`);
+    }
   }
 
   prepare(sql: string): Statement {
