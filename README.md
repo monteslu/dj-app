@@ -17,12 +17,33 @@ The real-time sample resampler and the BPM detector run in **WASM+SIMD**, not JS
 
 ## Run it
 
-From this directory:
+### Prerequisites
+- **Node ≥ 22** (uses npm workspaces; tested on Node 22–24).
+- **A C/C++ toolchain** — `better-sqlite3` is a native module compiled on install:
+  - Linux: `build-essential` + `python3` (`apt install build-essential python3`)
+  - macOS: Xcode Command Line Tools (`xcode-select --install`)
+  - Windows: Visual Studio Build Tools (C++ workload)
+- **No emcc needed** — the WASM (resampler, beat detector) is committed pre-built (base64-embedded
+  `.ts`). You only need emscripten if you change the C source in `packages/dsp-wasm/csrc/`.
+
+### Clone and run (any computer)
 
 ```bash
-npm install            # installs all workspaces
-npm run dev            # rebuilds native modules for Electron, builds, launches
+git clone git@github.com:monteslu/dj-app.git
+cd dj-app
+npm install            # installs all workspaces (+ self-heals the Electron binary)
+npm run dev            # electron-rebuild → build renderer/worklet/main → launch
 ```
+
+The renderer packages are bundled from source by Vite/esbuild, so there is **no separate
+`build:packages` step** before `dev` — `npm run dev` is the whole flow.
+
+**Linux/Wayland:** launch is handled automatically (`ELECTRON_OZONE_PLATFORM_HINT=auto` in
+`scripts/run-electron.mjs`); no flags needed on X11 or Wayland.
+
+> The `dev`/`start` scripts pass `--no-sandbox` (needed in some sandboxed/CI dev environments).
+> On a normal desktop this is harmless; remove it from `apps/desktop/package.json` if you prefer
+> the Chromium sandbox on.
 
 > **Native module ABI note (better-sqlite3):** tests run in Node; Electron needs a different ABI.
 > `dev`/`start` run `electron-rebuild` first. If `npm test`'s db tests then fail with a
