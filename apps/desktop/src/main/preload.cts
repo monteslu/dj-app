@@ -21,6 +21,8 @@ const api: DjApi = {
   },
   readTrackById: (id) => electron.ipcRenderer.invoke('library:readTrackById', id),
   librarySetAnalysis: (id, a) => electron.ipcRenderer.invoke('library:setAnalysis', id, a),
+  libraryWaveform: (id) => electron.ipcRenderer.invoke('library:waveform', id),
+  libraryUnanalyzed: (limit) => electron.ipcRenderer.invoke('library:unanalyzed', limit),
   libraryIncrementPlay: (id) => electron.ipcRenderer.invoke('library:incrementPlay', id),
   saveRecording: (wav) => electron.ipcRenderer.invoke('recording:save', wav),
   trackCover: (path) => electron.ipcRenderer.invoke('track:cover', path),

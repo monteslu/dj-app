@@ -62,7 +62,14 @@ export interface DjApi {
   libraryScan: () => Promise<ScanSummary | null>;
   onScanProgress: (cb: (p: ScanProgress) => void) => () => void;
   readTrackById: (id: number) => Promise<LoadedFile | null>;
-  librarySetAnalysis: (id: number, a: { bpm?: number; firstBeatFrame?: number }) => Promise<void>;
+  librarySetAnalysis: (
+    id: number,
+    a: { bpm?: number; firstBeatFrame?: number; key?: string; waveform?: Uint8Array; analyzedAt?: number },
+  ) => Promise<void>;
+  /** Cached overview peaks (Uint8 per bucket) for a track, or null. */
+  libraryWaveform: (id: number) => Promise<Uint8Array | null>;
+  /** Track ids not yet analyzed (for the background queue). */
+  libraryUnanalyzed: (limit?: number) => Promise<number[]>;
   libraryIncrementPlay: (id: number) => Promise<void>;
 
   /** Save a recording (WAV bytes) to disk; returns the path or null if canceled. */

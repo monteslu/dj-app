@@ -115,6 +115,22 @@ describe('LibraryDb', () => {
     expect(rows[0]!.key).toBe('Am');
   });
 
+  it('caches + reads back the waveform overview and tracks analyzed state', () => {
+    const id = addTrack({ location: '/m/wf.mp3' });
+    // not analyzed yet → shows up in the unanalyzed queue, no waveform
+    expect(db.unanalyzedTrackIds()).toContain(id);
+    expect(db.getWaveform(id)).toBeNull();
+
+    const peaks = new Uint8Array([0, 64, 128, 255, 200, 100, 50, 10]);
+    db.setAnalysis(id, { bpm: 124, waveform: peaks, analyzedAt: 1700000000 });
+
+    const back = db.getWaveform(id);
+    expect(back).not.toBeNull();
+    expect([...back!]).toEqual([...peaks]);
+    // now analyzed → no longer in the queue
+    expect(db.unanalyzedTrackIds()).not.toContain(id);
+  });
+
   it('stores and reads cues', () => {
     const id = addTrack({ location: '/m/cue.mp3' });
     db.setCues(id, [

@@ -162,7 +162,8 @@ export function Library(): React.JSX.Element {
         }
       });
 
-      // analyze if BPM/key missing
+      // analyze if BPM/key missing, and cache everything (incl. the overview
+      // peaks) so the next load is instant + the library row can draw a mini-wave.
       if (track.bpm <= 0 || !track.key) {
         void analysis.analyze(decoded).then((r) => {
           if (r.bpm > 0) {
@@ -170,7 +171,13 @@ export function Library(): React.JSX.Element {
             bus.set(g, DeckKeys.firstBeatFrame, r.firstBeatFrame);
           }
           if (r.camelot) setDeckTrack(deckIndex, { key: r.camelot });
-          void window.dj.librarySetAnalysis(track.id, { bpm: r.bpm, firstBeatFrame: r.firstBeatFrame });
+          void window.dj.librarySetAnalysis(track.id, {
+            bpm: r.bpm,
+            firstBeatFrame: r.firstBeatFrame,
+            key: r.camelot,
+            waveform: peaks.overview.peaks,
+            analyzedAt: Date.now(),
+          });
         });
       }
     },

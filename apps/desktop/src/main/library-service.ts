@@ -131,8 +131,19 @@ export class LibraryService {
     }
   }
 
-  setAnalysis(trackId: number, a: { bpm?: number; firstBeatFrame?: number; key?: string }): void {
+  setAnalysis(
+    trackId: number,
+    a: { bpm?: number; firstBeatFrame?: number; key?: string; waveform?: Uint8Array; analyzedAt?: number },
+  ): void {
     this.db.setAnalysis(trackId, a);
+  }
+
+  getWaveform(trackId: number): Uint8Array | null {
+    return this.db.getWaveform(trackId);
+  }
+
+  unanalyzedTrackIds(limit?: number): number[] {
+    return this.db.unanalyzedTrackIds(limit);
   }
 
   /** Extract the embedded cover image for a file path. Returns {data, mime} or null. */

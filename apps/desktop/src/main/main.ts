@@ -156,9 +156,16 @@ ipcMain.handle('library:query', (_e, opts: QueryOptions) => getLibrary().query(o
 ipcMain.handle('library:count', (_e, search?: string) => getLibrary().count(search));
 ipcMain.handle('library:crates', () => getLibrary().listCrates());
 ipcMain.handle('library:crateTracks', (_e, id: number) => getLibrary().crateTracks(id));
-ipcMain.handle('library:setAnalysis', (_e, id: number, a: { bpm?: number; firstBeatFrame?: number }) =>
-  getLibrary().setAnalysis(id, a),
+ipcMain.handle(
+  'library:setAnalysis',
+  (
+    _e,
+    id: number,
+    a: { bpm?: number; firstBeatFrame?: number; key?: string; waveform?: Uint8Array; analyzedAt?: number },
+  ) => getLibrary().setAnalysis(id, a),
 );
+ipcMain.handle('library:waveform', (_e, id: number) => getLibrary().getWaveform(id));
+ipcMain.handle('library:unanalyzed', (_e, limit?: number) => getLibrary().unanalyzedTrackIds(limit));
 ipcMain.handle('library:incrementPlay', (_e, id: number) => getLibrary().incrementPlayCount(id));
 ipcMain.handle('track:cover', (_e, path: string) => getLibrary().getCover(path));
 

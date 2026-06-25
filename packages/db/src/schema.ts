@@ -108,6 +108,17 @@ export const MIGRATIONS: Migration[] = [
       );
     `,
   },
+  {
+    version: 2,
+    description: 'cached waveform overview + analysis timestamp',
+    up: `
+      -- compressed overview peaks (Uint8 per bucket), so the library can show a
+      -- mini-waveform and decks can skip recompute. NULL = not analyzed yet.
+      ALTER TABLE library ADD COLUMN waveform BLOB;
+      ALTER TABLE library ADD COLUMN waveform_buckets INTEGER DEFAULT 0;
+      ALTER TABLE library ADD COLUMN analyzed_at INTEGER DEFAULT 0;
+    `,
+  },
 ];
 
 export const REQUIRED_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;

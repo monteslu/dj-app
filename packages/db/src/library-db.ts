@@ -111,7 +111,17 @@ export class LibraryDb {
   }
 
   /** Update analysis results on a track. */
-  setAnalysis(trackId: number, a: { bpm?: number; firstBeatFrame?: number; key?: string }): void {
+  setAnalysis(
+    trackId: number,
+    a: {
+      bpm?: number;
+      firstBeatFrame?: number;
+      key?: string;
+      /** Overview peaks (one Uint8 per bucket) to cache for the mini-waveform. */
+      waveform?: Uint8Array;
+      analyzedAt?: number;
+    },
+  ): void {
     const sets: string[] = [];
     const params: Record<string, unknown> = { id: trackId };
     if (a.bpm !== undefined) {
@@ -126,10 +136,41 @@ export class LibraryDb {
       sets.push('key = @key');
       params.key = a.key;
     }
+    if (a.waveform !== undefined) {
+      sets.push('waveform = @wf', 'waveform_buckets = @wfb');
+      params.wf = a.waveform;
+      params.wfb = a.waveform.length;
+    }
+    if (a.analyzedAt !== undefined) {
+      sets.push('analyzed_at = @at');
+      params.at = a.analyzedAt;
+    }
     if (sets.length === 0) {
       return;
     }
     this.db.prepare(`UPDATE library SET ${sets.join(', ')} WHERE id = @id`).run(params);
+  }
+
+  /** Cached overview peaks for a track (one Uint8 per bucket), or null. */
+  getWaveform(trackId: number): Uint8Array | null {
+    const row = this.db
+      .prepare('SELECT waveform FROM library WHERE id = ?')
+      .get(trackId) as { waveform: Uint8Array | null } | undefined;
+    const wf = row?.waveform ?? null;
+    return wf && wf.length > 0 ? new Uint8Array(wf) : null;
+  }
+
+  /** Track ids that have NOT been analyzed yet (for the background queue). */
+  unanalyzedTrackIds(limit = 500): number[] {
+    return (
+      this.db
+        .prepare(
+          `SELECT l.id FROM library l JOIN track_locations t ON l.location = t.id
+           WHERE l.mixxx_deleted = 0 AND t.fs_deleted = 0 AND COALESCE(l.analyzed_at, 0) = 0
+           LIMIT ?`,
+        )
+        .all(limit) as Array<{ id: number }>
+    ).map((r) => r.id);
   }
 
   /** Query tracks with search/sort/paging. */
