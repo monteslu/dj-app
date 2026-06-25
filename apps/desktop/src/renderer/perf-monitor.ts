@@ -25,6 +25,19 @@ export function startPerfMonitor(intervalSec = 3): void {
   if (started) return;
   started = true;
 
+  // Stamp the renderer's Chromium + WebGL/WebGPU capability into the log, so a
+  // pasted dump shows what actually ran (and whether GPU accel is even active).
+  try {
+    const c = document.createElement('canvas');
+    const gl = c.getContext('webgl2') || c.getContext('webgl');
+    const dbg = gl && (gl as WebGLRenderingContext).getExtension('WEBGL_debug_renderer_info');
+    const renderer = dbg ? (gl as WebGLRenderingContext).getParameter(dbg.UNMASKED_RENDERER_WEBGL) : 'n/a';
+    const ua = navigator.userAgent.match(/Chrome\/[\d.]+/)?.[0] ?? 'ua?';
+    console.log(`[perf] env: ${ua} | webgl=${!!gl} | webgpu=${'gpu' in navigator} | renderer=${renderer}`);
+  } catch {
+    /* never block startup on the version probe */
+  }
+
   let frames = 0;
   let last = performance.now();
   let windowStart = last;

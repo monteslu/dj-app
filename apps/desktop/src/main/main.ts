@@ -27,6 +27,13 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const RENDERER_DIR = join(__dirname, '../dist-renderer');
 const isDev = process.argv.includes('--dev');
 
+// Log versions on startup so a pasted console dump unambiguously shows WHICH
+// Electron/Chromium actually ran (stale binaries vs the upgraded one are otherwise
+// indistinguishable in the logs).
+console.log(
+  `[dj-app] electron ${process.versions.electron} | chromium ${process.versions.chrome} | node ${process.versions.node}`,
+);
+
 // Set a clean app name BEFORE any getPath('userData') call. The package name is
 // "@internal-dj/desktop", whose "/" produces a nested userData path
 // (.config/@internal-dj/desktop) — fragile for file creation. Use a flat name.
