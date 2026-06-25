@@ -33,16 +33,20 @@ const isDev = process.argv.includes('--dev');
 app.setName('dj-app');
 
 // On Linux/Wayland some drivers crash-loop in Chromium's native-GPU-buffer
-// (GBM/pixmap) 2D raster path — "eglCreateImage failed", "OzoneImageBacking ...
-// GPU process exited unexpectedly" — which pegs the frame rate to ~30fps with
-// huge spikes (measured: our own waveform draw is <1ms; the rest is the GPU
-// process restarting). This is a COMPOSITOR-RASTER issue, NOT our WebGL/WebGPU
-// rendering — disabling the native GPU memory-buffer path stops the crash while
-// keeping GPU acceleration + WebGPU. Opt out with DJ_NATIVE_GPU=1.
+// (GBM/pixmap) raster path — "eglCreateImage failed", "OzoneImageBacking ... GPU
+// process exited unexpectedly" — which pegs the frame rate to ~30fps with huge
+// spikes (measured: our own waveform draw is <1ms; the rest is the GPU process
+// restarting). This is a COMPOSITOR-RASTER issue, NOT our WebGL/WebGPU rendering.
+// All switches below are verified present in the bundled Chromium binary:
+//   --disable-gpu-memory-buffer-compositor-resources : stop using GBM/SharedImage
+//        backing for compositor tiles (the OzoneImageBacking path that crashes)
+//   --disable-features=CanvasOopRasterization : route 2D canvas raster off the
+//        out-of-process SharedImage path that's failing
+// These keep GPU acceleration + WebGPU; they do NOT force a GL backend. Opt out
+// with DJ_NATIVE_GPU=1.
 if (process.platform === 'linux' && process.env.DJ_NATIVE_GPU !== '1') {
-  app.commandLine.appendSwitch('disable-features', 'UseGpuMemoryBufferVideoFrames');
   app.commandLine.appendSwitch('disable-gpu-memory-buffer-compositor-resources');
-  app.commandLine.appendSwitch('disable-gpu-memory-buffer-video-frames');
+  app.commandLine.appendSwitch('disable-features', 'CanvasOopRasterization');
 }
 
 // NOTE: the Wayland-vs-X11 display backend is selected via the
