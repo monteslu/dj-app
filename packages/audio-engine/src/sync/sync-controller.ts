@@ -33,9 +33,6 @@ export interface SyncDeps {
   seekFrames: (deckIndex: number, frame: number) => void;
 }
 
-const MAX_PHASE_ADJUST = 0.04;
-const PHASE_GAIN = 0.5;
-
 export class SyncController {
   private readonly offs: Array<() => void> = [];
 
@@ -165,23 +162,13 @@ export class SyncController {
       const factor = this.halfDoubleFactor(followerBpm, leaderBpm);
       const baseRatio = leaderBpm / (followerBpm * factor);
 
-      const fg = this.grid(d);
-      const lg = this.grid(leaderIdx);
-      // Only phase-hold when the leader is actually PLAYING (and both grids known)
-      // — otherwise just match tempo so the BPMs lock without chasing a frozen
-      // playhead.
-      const leaderPlaying = bus.get(deckGroup(leaderIdx + 1), DeckKeys.play) > 0.5;
-      if (!fg || !lg || !leaderPlaying) {
-        this.deps.setRateRatio(d, baseRatio);
-        continue;
-      }
-      const leaderPhase = beatDistance(lg, this.deps.positionFrames(leaderIdx));
-      const fphase = beatDistance(fg, this.deps.positionFrames(d));
-      let err = leaderPhase - fphase;
-      if (err > 0.5) err -= 1;
-      else if (err < -0.5) err += 1;
-      const adjust = clamp(err * PHASE_GAIN, -MAX_PHASE_ADJUST, MAX_PHASE_ADJUST);
-      this.deps.setRateRatio(d, baseRatio * (1 + adjust));
+      // Match tempo EXACTLY (follower's effective BPM == leader's) and hold that
+      // steady ratio. We do NOT continuously nudge the rate to chase phase: once
+      // tempos are equal the grids stay aligned on their own, and constant rate
+      // nudging audibly warbles the follower's pitch ("sounds like shit"). Phase
+      // is set ONCE by the snap on SYNC/Smart-Fader enable (onSyncToggle /
+      // phaseAlign), not corrected every tick.
+      this.deps.setRateRatio(d, baseRatio);
     }
   }
 
@@ -189,8 +176,4 @@ export class SyncController {
     for (const off of this.offs) off();
     this.offs.length = 0;
   }
-}
-
-function clamp(v: number, lo: number, hi: number): number {
-  return v < lo ? lo : v > hi ? hi : v;
 }
