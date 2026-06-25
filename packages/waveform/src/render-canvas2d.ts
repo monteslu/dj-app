@@ -260,13 +260,15 @@ export function drawScrolling(
   //     ctx translate can't touch heights — the bars are already shaped.
   const posPx = positionFrames / framesPerPx;
   const snapPx = Math.round(posPx);
-  const subPx = posPx - snapPx; // -0.5..0.5
   const bands = detail.low && detail.mid && detail.high;
 
-  ctx.save();
-  ctx.translate(-subPx, 0); // smooth sub-pixel slide of the snapped bars
-  // draw one extra column each side so the translate never reveals a gap
-  for (let x = -1; x <= w; x++) {
+  // NOTE: bars are drawn at INTEGER x with no fractional translate. A fractional
+  // ctx.translate on 1px-wide fillRects makes the browser anti-alias each bar
+  // across 2 pixels — and the split opacity varies with the sub-pixel offset, so
+  // the WHOLE waveform's brightness flickers every frame. Whole-pixel placement
+  // keeps every bar crisp and its brightness constant. (Sub-pixel-smooth scroll
+  // needs an offscreen + drawImage blit; integer placement is flicker-free.)
+  for (let x = 0; x < w; x++) {
     const b = snapPx + (x - centerX); // integer bucket-column (snapped → frozen)
     const frame = b * framesPerPx;
     if (frame < 0) continue;
@@ -275,15 +277,15 @@ export function drawScrolling(
     const v = peaks[bi]!;
     const amp = (v / 255) * mid * 0.92;
     if (amp <= 0) continue;
+    const played = x < centerX;
     if (bands) {
-      ctx.fillStyle = bandColorCss(detail.low![bi]!, detail.mid![bi]!, detail.high![bi]!, x < centerX);
+      ctx.fillStyle = bandColorCss(detail.low![bi]!, detail.mid![bi]!, detail.high![bi]!, played);
     } else {
       const bucket = ((v / 255) * (PALETTE_N - 1)) | 0;
-      ctx.fillStyle = x < centerX ? PALETTE_PLAYED[bucket]! : PALETTE_LIVE[bucket]!;
+      ctx.fillStyle = played ? PALETTE_PLAYED[bucket]! : PALETTE_LIVE[bucket]!;
     }
     ctx.fillRect(x, mid - amp, 1, amp * 2);
   }
-  ctx.restore();
 
   // center playhead — glowing line (drawn AFTER restore so it stays fixed/sharp)
   ctx.fillStyle = 'rgba(255,90,90,0.18)';
