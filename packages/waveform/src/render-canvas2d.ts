@@ -154,6 +154,22 @@ function bandColorCss(low: number, mid: number, high: number, played: boolean): 
   return `rgb(${r},${g},${b})`;
 }
 
+// A reused offscreen canvas for the bars (so the sub-pixel drawImage slide is a
+// clean translate of a finished image). One shared canvas, resized on demand —
+// the lanes draw sequentially within a frame, so sharing is safe.
+let barsCanvas: HTMLCanvasElement | OffscreenCanvas | null = null;
+function getBarsCanvas(w: number, h: number): HTMLCanvasElement | OffscreenCanvas {
+  if (!barsCanvas) {
+    barsCanvas =
+      typeof OffscreenCanvas !== 'undefined'
+        ? new OffscreenCanvas(w, h)
+        : (globalThis.document?.createElement('canvas') as HTMLCanvasElement);
+  }
+  if (barsCanvas.width !== w) barsCanvas.width = w;
+  if (barsCanvas.height !== h) barsCanvas.height = h;
+  return barsCanvas;
+}
+
 // Precomputed color palette (built once). Changing ctx.fillStyle per pixel +
 // allocating an rgb() string per pixel was the cause of choppy waveform playback
 // (~1000 string allocs + 1000 GPU state flushes per frame). Instead we quantize
@@ -250,25 +266,28 @@ export function drawScrolling(
     }
   }
 
-  // Waveform bars — DETERMINISTIC, no height morph. Two-part scroll:
-  //  1. SNAP the sampling origin to the pixel grid: each integer column maps to a
-  //     fixed source-bucket range, so a bucket's bar height NEVER changes as we
-  //     scroll (horizontal movement can't cause vertical change). This is the same
-  //     rule Mixxx uses (round(pos/fpp)*fpp).
-  //  2. Translate the whole draw by the sub-pixel REMAINDER so the snapped bars
-  //     slide smoothly instead of stepping a whole pixel at a time. A pure
-  //     ctx translate can't touch heights — the bars are already shaped.
+  // Waveform bars — frozen heights AND smooth sub-pixel scroll, done right:
+  //  1. SNAP the sampling origin to the pixel grid so each integer column maps to a
+  //     fixed source-bucket range → a bucket's bar height NEVER changes as we
+  //     scroll (Mixxx's rule: round(pos/fpp)*fpp). Heights are deterministic.
+  //  2. Draw the bars at INTEGER x onto an OFFSCREEN canvas (crisp, full opacity).
+  //  3. drawImage the offscreen onto the lane shifted by the sub-pixel REMAINDER.
+  //     drawImage does ONE bilinear translate of the finished image — smooth slide,
+  //     and it can't change heights OR flicker brightness (the bars are already a
+  //     finished picture; we just slide it). This avoids the per-bar anti-alias
+  //     brightness pulse that a fractional ctx.translate on 1px fillRects caused.
   const posPx = positionFrames / framesPerPx;
   const snapPx = Math.round(posPx);
+  const subPx = posPx - snapPx; // -0.5..0.5
   const bands = detail.low && detail.mid && detail.high;
 
-  // NOTE: bars are drawn at INTEGER x with no fractional translate. A fractional
-  // ctx.translate on 1px-wide fillRects makes the browser anti-alias each bar
-  // across 2 pixels — and the split opacity varies with the sub-pixel offset, so
-  // the WHOLE waveform's brightness flickers every frame. Whole-pixel placement
-  // keeps every bar crisp and its brightness constant. (Sub-pixel-smooth scroll
-  // needs an offscreen + drawImage blit; integer placement is flicker-free.)
-  for (let x = 0; x < w; x++) {
+  // offscreen is 2px wider so the sub-pixel slide never reveals an edge gap
+  const off = getBarsCanvas(w + 2, h);
+  const octx = off.getContext('2d') as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
+  octx.clearRect(0, 0, w + 2, h);
+  // offscreen column ox corresponds to lane x = ox - 1 (1px left margin)
+  for (let ox = 0; ox < w + 2; ox++) {
+    const x = ox - 1;
     const b = snapPx + (x - centerX); // integer bucket-column (snapped → frozen)
     const frame = b * framesPerPx;
     if (frame < 0) continue;
@@ -279,13 +298,15 @@ export function drawScrolling(
     if (amp <= 0) continue;
     const played = x < centerX;
     if (bands) {
-      ctx.fillStyle = bandColorCss(detail.low![bi]!, detail.mid![bi]!, detail.high![bi]!, played);
+      octx.fillStyle = bandColorCss(detail.low![bi]!, detail.mid![bi]!, detail.high![bi]!, played);
     } else {
       const bucket = ((v / 255) * (PALETTE_N - 1)) | 0;
-      ctx.fillStyle = played ? PALETTE_PLAYED[bucket]! : PALETTE_LIVE[bucket]!;
+      octx.fillStyle = played ? PALETTE_PLAYED[bucket]! : PALETTE_LIVE[bucket]!;
     }
-    ctx.fillRect(x, mid - amp, 1, amp * 2);
+    octx.fillRect(ox, mid - amp, 1, amp * 2);
   }
+  // blit with the sub-pixel slide. drawImage at a fractional x = smooth translate.
+  ctx.drawImage(off as CanvasImageSource, -1 - subPx, 0);
 
   // center playhead — glowing line (drawn AFTER restore so it stays fixed/sharp)
   ctx.fillStyle = 'rgba(255,90,90,0.18)';
