@@ -137,6 +137,7 @@ function masterControls(): ControlDef[] {
   const m = MASTER;
   return [
     { group: m, key: MasterKeys.sampleRate, default: 48000, min: 8000, max: 192000 },
+    { group: m, key: MasterKeys.waveformZoom, default: 2, min: 0, max: 4, persist: true, description: 'Waveform zoom preset index' },
     { group: m, key: MasterKeys.crossfader, default: 0, min: -1, max: 1, persist: true },
     { group: m, key: MasterKeys.crossfaderCurve, default: 0.6, persist: true },
     { group: m, key: MasterKeys.crossfaderReverse, default: 0, persist: true },

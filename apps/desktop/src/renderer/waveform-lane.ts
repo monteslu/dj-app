@@ -12,13 +12,18 @@ import { reportLaneDraw } from './perf-monitor.js';
 import { onFrame } from './frame-loop.js';
 
 const SR = 48000;
-// FIXED zoom: source frames per screen pixel. Like Mixxx, the waveform's sample→
-// pixel scale is a CONSTANT and never derives from BPM — deriving it from the live
-// (async-updating, often-0) fileBpm made the whole waveform rescale every frame,
-// which is the shimmering/resizing jank. BPM only drives the beat-grid overlay
-// (drawn from firstBeatFrame + framesPerBeat), not the wave scale. ~512 frames/px
-// ≈ 10.6ms/px at 48k → a few seconds across the lane, scrolls smoothly.
-const FRAMES_PER_PX = 512;
+// FIXED zoom presets: source frames per screen pixel. Like Mixxx, the waveform's
+// sample→pixel scale is a CONSTANT (never derived from BPM — that caused the
+// every-frame rescale/shimmer). A few discrete levels the user cycles through;
+// global (same on both decks) so synced waves line up. Index 0 = most zoomed in.
+// At 48k: 256→5.3ms/px, 512→10.7ms/px, etc.
+export const ZOOM_PRESETS = [256, 384, 512, 768, 1152];
+const DEFAULT_ZOOM_INDEX = 2;
+
+export function framesPerPxForZoom(index: number): number {
+  const i = Math.max(0, Math.min(ZOOM_PRESETS.length - 1, Math.round(index)));
+  return ZOOM_PRESETS[i]!;
+}
 
 export class WaveformLaneController {
   private gl: WaveformGL | null = null;
@@ -74,10 +79,11 @@ export class WaveformLaneController {
       const framesPerBeat = fileBpm > 0 ? (60 / fileBpm) * sr : 0;
       const fbf = this.bus.get(g, DeckKeys.firstBeatFrame);
 
-      // FIXED zoom — does NOT depend on BPM (see FRAMES_PER_PX). The wave scale is
-      // constant so it never rescales/shimmers; the beat grid below still uses
+      // FIXED zoom from the global preset index — does NOT depend on BPM, so the
+      // wave scale never rescales/shimmers. The beat grid below still uses
       // framesPerBeat for its lines.
-      const framesPerPx = FRAMES_PER_PX;
+      const zoomIdx = this.bus.get(MASTER, MasterKeys.waveformZoom);
+      const framesPerPx = framesPerPxForZoom(zoomIdx >= 0 ? zoomIdx : DEFAULT_ZOOM_INDEX);
 
       const params = {
         positionFrames: fraction * frames,

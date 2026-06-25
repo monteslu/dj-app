@@ -7,8 +7,9 @@
  */
 
 import { memo, useEffect, useRef } from 'react';
+import { MASTER, MasterKeys } from '@internal-dj/control-bus';
 import { useDj } from '../dj-context.js';
-import { WaveformLaneController } from '../waveform-lane.js';
+import { WaveformLaneController, ZOOM_PRESETS } from '../waveform-lane.js';
 
 // Thin shell: mount a canvas, hand it to the controller (which owns all the GPU
 // render logic + rAF loop). No render logic in the JSX.
@@ -35,9 +36,36 @@ const DeckLane = memo(function DeckLane({
   );
 });
 
+// Cycle through the fixed zoom presets (global; lower index = more zoomed in).
+function ZoomControl(): React.JSX.Element {
+  const { bus } = useDj();
+  const nudge = (dir: -1 | 1) => {
+    const cur = Math.round(bus.get(MASTER, MasterKeys.waveformZoom));
+    const next = Math.max(0, Math.min(ZOOM_PRESETS.length - 1, cur + dir));
+    bus.set(MASTER, MasterKeys.waveformZoom, next);
+  };
+  // scroll over the band zooms; +/- buttons too
+  const onWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    nudge(e.deltaY > 0 ? 1 : -1); // wheel down = zoom out
+  };
+  return (
+    <div className="wf-zoom" onWheel={onWheel} title="Waveform zoom (scroll or +/-)">
+      <button className="tiny" onClick={() => nudge(1)} aria-label="Zoom out">
+        −
+      </button>
+      <span className="wf-zoom-label">zoom</span>
+      <button className="tiny" onClick={() => nudge(-1)} aria-label="Zoom in">
+        +
+      </button>
+    </div>
+  );
+}
+
 export function WaveformBand(): React.JSX.Element {
   return (
     <section className="waveform-band" aria-label="Waveforms">
+      <ZoomControl />
       <DeckLane deckIndex={0} framesPerPx={90} />
       <DeckLane deckIndex={1} framesPerPx={90} />
     </section>

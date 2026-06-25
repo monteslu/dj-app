@@ -202,6 +202,10 @@ export function beatloopActivateKey(size: number): Key {
 
 export const MasterKeys = {
   sampleRate: 'samplerate', // the AudioContext sample rate (set by the engine)
+  // Waveform zoom level: an INDEX into a fixed set of frames-per-pixel presets
+  // (0 = most zoomed in). Global so both decks share a scale and synced waves line
+  // up. The lane maps the index to frames/px.
+  waveformZoom: 'waveform_zoom',
   crossfader: 'crossfader', // -1..1
   crossfaderCurve: 'xFaderCurve',
   crossfaderReverse: 'xFaderReverse',
