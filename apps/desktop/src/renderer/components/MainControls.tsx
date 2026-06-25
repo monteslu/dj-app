@@ -9,7 +9,6 @@ import { useControl, useControlValue } from '../dj-context.js';
 import { Knob } from './Knob.js';
 
 export function MainControls(): React.JSX.Element {
-  const gain = useControlValue(MASTER, MasterKeys.gain);
   const [smartFader, setSmartFader] = useControl(MASTER, MasterKeys.smartFaderEnabled);
   const sfActive = useControlValue(MASTER, MasterKeys.smartFaderActive) > 0.5;
   const sfTargetBpm = useControlValue(MASTER, MasterKeys.smartFaderTargetBpm);
@@ -26,7 +25,6 @@ export function MainControls(): React.JSX.Element {
         🧠
       </button>
       <Knob group={MASTER} ckey={MasterKeys.gain} label="MAIN" min={0} max={5} center={1} hint="Master output level" />
-      <span className="mixer-mainval">{gain.toFixed(1)}</span>
     </div>
   );
 }
