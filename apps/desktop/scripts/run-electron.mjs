@@ -16,19 +16,11 @@ const electron = require('electron'); // resolves to the binary path string
 
 const env = { ...process.env };
 if (process.platform === 'linux' && !env.ELECTRON_OZONE_PLATFORM_HINT) {
-  // X11 ozone (XWayland) by default. Chromium itself reports the reason:
-  //   "'--ozone-platform=wayland' is not compatible with Vulkan. Consider
-  //    switching to '--ozone-platform=x11' or disabling Vulkan"
-  // We REQUIRE Vulkan (WebGPU / stem separation), so on native Wayland Chromium
-  // falls back to a slow present path → pinned ~30fps. Running under XWayland
-  // makes Vulkan + the compositor cooperate → full frame rate, GPU accel, and
-  // WebGPU all intact. (Same fix loukai uses.) DJ_WAYLAND=1 forces native Wayland.
-  if (process.env.DJ_WAYLAND === '1') {
-    env.ELECTRON_OZONE_PLATFORM_HINT = 'auto';
-  } else {
-    env.ELECTRON_OZONE_PLATFORM_HINT = 'x11';
-    if (!env.DISPLAY) env.DISPLAY = ':0'; // XWayland runs here
-  }
+  // Native Wayland (auto). Without Vulkan enabled (see main.ts — WebGPU is opt-in
+  // via DJ_WEBGPU), the Wayland present path is FAST and the waveform WebGL flies.
+  // The Vulkan/Wayland incompatibility that pinned ~30fps only bites when Vulkan
+  // is on, which we no longer do by default.
+  env.ELECTRON_OZONE_PLATFORM_HINT = 'auto';
 }
 
 const args = ['.', ...process.argv.slice(2)];

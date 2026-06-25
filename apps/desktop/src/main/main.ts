@@ -46,17 +46,17 @@ app.setName('dj-app');
 //   enable-features=Vulkan : provides the Dawn backend — without it WebGPU is
 //        absent or "super slow" (per loukai's verified config). Linux→Vulkan,
 //        macOS→Metal, Windows→D3D12 under the hood.
-app.commandLine.appendSwitch('enable-unsafe-webgpu');
-app.commandLine.appendSwitch('enable-features', 'Vulkan');
-
-// NOTE: the GPU crash-loop on Linux ("eglCreateImage failed / OzoneImageBacking
-// ... GPU process exited unexpectedly") is Chromium's NATIVE-Wayland backend
-// being incompatible with the Vulkan/GPU path. It's fixed by running under X11
-// ozone (XWayland), selected via ELECTRON_OZONE_PLATFORM_HINT in
-// scripts/run-electron.mjs — that env var must be set BEFORE Electron's early
-// init (app.commandLine switches are read too late). Same fix loukai uses. No
-// other GPU command-line switches: they were guesses that didn't address the
-// actual native-Wayland cause.
+// SPEED over experimental WebGPU. On Linux, enabling Vulkan is what forces
+// Chromium's native-Wayland present path into a slow ~30fps fallback ("wayland is
+// not compatible with Vulkan"). WebGPU on Linux is still experimental, so we do
+// NOT enable Vulkan by default — that keeps the fast GL present path on Wayland
+// and the waveform WebGL renderer flies. Stems (Demucs) run on WASM for now, like
+// loukai does on Wayland. Opt into WebGPU/Vulkan later with DJ_WEBGPU=1 (accepts
+// the frame-rate hit), e.g. for GPU stem separation on a beefy machine.
+if (process.env.DJ_WEBGPU === '1') {
+  app.commandLine.appendSwitch('enable-unsafe-webgpu');
+  app.commandLine.appendSwitch('enable-features', 'Vulkan');
+}
 
 
 const SCHEME = 'app';
