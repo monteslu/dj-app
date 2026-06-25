@@ -12,6 +12,7 @@ import { Library } from './components/Library.js';
 import { AudioSettings } from './components/AudioSettings.js';
 import { TempoFader } from './components/Faders.js';
 import { WaveformBand } from './components/WaveformBand.js';
+import { useLayoutControls, applyPrefs, getPrefs } from './layout-prefs.js';
 import { isDemo, seedDemo } from './demo.js';
 
 /**
@@ -95,6 +96,20 @@ function RecordButton(): React.JSX.Element {
 function Stage(): React.JSX.Element {
   const { started, start, bus } = useDj();
   const [showAudio, setShowAudio] = useState(false);
+  const { prefs, toggleDensity, setPreset } = useLayoutControls();
+
+  // Apply saved layout prefs to the .app element on mount. A ?layout=/?density=
+  // query param overrides (used for screenshots / sharing a view).
+  useEffect(() => {
+    const q = new URLSearchParams(location.search);
+    const ql = q.get('layout');
+    const qd = q.get('density');
+    if (ql === 'performance' || ql === 'library' || ql === 'minimal') setPreset(ql);
+    if (qd === 'compact' || qd === 'comfortable') {
+      if (getPrefs().density !== qd) toggleDensity();
+    }
+    applyPrefs(getPrefs());
+  }, [setPreset, toggleDensity]);
 
   useEffect(() => {
     if (isDemo()) {
@@ -104,11 +119,36 @@ function Stage(): React.JSX.Element {
     }
   }, [bus]);
 
+  const PRESETS: { id: 'performance' | 'library' | 'minimal'; label: string; hint: string }[] = [
+    { id: 'performance', label: 'Perform', hint: 'Balanced decks + library' },
+    { id: 'library', label: 'Library', hint: 'Maximize the browser' },
+    { id: 'minimal', label: 'Minimal', hint: 'Decks only, compact' },
+  ];
+
   return (
-    <div className="app">
+    <div className="app" data-density={prefs.density} data-layout={prefs.preset}>
       <div className="titlebar">
         <span className="brand">dj-app</span>
         <span className="tagline">built for the love of it</span>
+        <div className="layout-presets" role="group" aria-label="Layout preset">
+          {PRESETS.map((p) => (
+            <button
+              key={p.id}
+              className={`tiny ${prefs.preset === p.id ? 'active' : ''}`}
+              onClick={() => setPreset(p.id)}
+              title={p.hint}
+            >
+              {p.label}
+            </button>
+          ))}
+          <button
+            className={`tiny ${prefs.density === 'compact' ? 'active' : ''}`}
+            onClick={toggleDensity}
+            title="Toggle compact / comfortable spacing"
+          >
+            {prefs.density === 'compact' ? '⊟ compact' : '⊞ comfy'}
+          </button>
+        </div>
         <RecordButton />
         <button className="tiny audio-routing-btn" onClick={() => setShowAudio(true)}>
           🔊 audio routing

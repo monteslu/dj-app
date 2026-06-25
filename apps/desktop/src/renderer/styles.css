@@ -73,12 +73,43 @@ body,
 .app {
   /* --console-h is set by the Splitter drag; defaults to a flexible share. */
   --console-h: minmax(220px, 1fr);
+  /* library row min/ratio — presets tune these. */
+  --library-min: 120px;
+  --library-fr: 1fr;
   display: grid;
-  grid-template-rows: auto auto var(--console-h) auto minmax(120px, 1fr) auto;
+  grid-template-rows: auto auto var(--console-h) auto minmax(var(--library-min), var(--library-fr)) auto;
   grid-template-areas: 'top' 'waveband' 'console' 'split' 'library' 'status';
   height: 100%;
   background:
     radial-gradient(1400px 600px at 50% -10%, #141a26 0%, transparent 70%), var(--bg);
+}
+
+/* density toggle: compact tightens the fluid scale globally */
+.app[data-density='compact'] {
+  --density: 0.86;
+}
+
+/* layout presets — instant, CSS-driven (Mixxx needs separate skin files):
+   performance = balanced (default); library = bigger browser; minimal = decks
+   take the room, browser shrinks to a strip. */
+.app[data-layout='performance'] {
+  --console-h: minmax(220px, 1fr);
+  --library-fr: 1fr;
+}
+.app[data-layout='library'] {
+  --console-h: minmax(200px, 0.7fr);
+  --library-fr: 1.6fr;
+}
+.app[data-layout='minimal'] {
+  --console-h: minmax(240px, 1.5fr);
+  --library-min: 80px;
+  --library-fr: 0.5fr;
+}
+
+.layout-presets {
+  display: flex;
+  gap: 4px;
+  margin-left: 12px;
 }
 
 /* drag handle between the decks and the library */
