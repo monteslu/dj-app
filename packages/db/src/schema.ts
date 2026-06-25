@@ -13,7 +13,7 @@
  *   directories      — watched roots
  */
 
-import type { Database } from 'better-sqlite3';
+import type { SqliteDb } from './sqlite.js';
 
 export interface Migration {
   version: number;
@@ -117,7 +117,7 @@ export const REQUIRED_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;
  * PRAGMA user_version as the stored schema version (Mixxx's settings('version')
  * equivalent). Idempotent.
  */
-export function migrate(db: Database): void {
+export function migrate(db: SqliteDb): void {
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
   const current = db.pragma('user_version', { simple: true }) as number;

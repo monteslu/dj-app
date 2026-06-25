@@ -4,7 +4,7 @@
     "rootDir": "./src",
     "outDir": "./dist",
     "lib": ["ES2023"],
-    "types": ["node", "better-sqlite3"]
+    "types": ["node"]
   },
   "include": ["src/**/*"]
 }

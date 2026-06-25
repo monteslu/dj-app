@@ -9,8 +9,10 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 
-// Modules that must NOT be bundled (native addons + electron + node builtins).
-const external = ['electron', 'better-sqlite3', 'music-metadata'];
+// Modules that must NOT be bundled (electron + WASM/native-loading modules).
+// node-sqlite3-wasm loads its own .wasm relative to its package dir, so keep it
+// external rather than bundling. music-metadata stays external too.
+const external = ['electron', 'node-sqlite3-wasm', 'music-metadata'];
 
 const common = {
   bundle: true,

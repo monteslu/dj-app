@@ -11,23 +11,22 @@
     "build:main": "node scripts/build-main.mjs",
     "typecheck:main": "tsc -p tsconfig.main.json --noEmit",
     "build": "npm run build:renderer && npm run build:worklet && npm run build:main",
-    "rebuild:electron": "electron-rebuild -m ../../node_modules/better-sqlite3",
     "postinstall": "node scripts/ensure-electron.js",
-    "dev": "npm run rebuild:electron && npm run build && node scripts/run-electron.mjs --dev --no-sandbox",
-    "start": "npm run rebuild:electron && node scripts/run-electron.mjs --no-sandbox"
+    "dev": "npm run build && node scripts/run-electron.mjs --dev --no-sandbox",
+    "start": "npm run build && node scripts/run-electron.mjs --no-sandbox"
   },
   "dependencies": {
     "@internal-dj/audio-engine": "*",
     "@internal-dj/codec": "*",
     "@internal-dj/control-bus": "*",
+    "@internal-dj/db": "*",
     "@internal-dj/waveform": "*",
-    "better-sqlite3": "^12.11.1",
     "music-metadata": "^11.13.0",
+    "node-sqlite3-wasm": "^0.8.58",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "@electron/rebuild": "^4.0.4",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.4",

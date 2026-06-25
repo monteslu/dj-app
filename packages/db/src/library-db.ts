@@ -1,10 +1,11 @@
 /**
  * LibraryDb — the library database (Mixxx TrackCollection analog,
- * 05-library-and-data.md §1.3). Owns the better-sqlite3 connection + the
- * repository methods. Main-process only.
+ * 05-library-and-data.md §1.3). Owns the SQLite connection + the repository
+ * methods. Main-process only. Backed by pure-WASM SQLite (node-sqlite3-wasm via
+ * the SqliteDb adapter): no native addon, no electron-rebuild, no toolchain.
  */
 
-import Database from 'better-sqlite3';
+import { SqliteDb } from './sqlite.js';
 import { migrate } from './schema.js';
 import { parseSearch } from './search.js';
 import { CueType, type CueRow, type TrackInput, type TrackRow } from './types.js';
@@ -36,10 +37,10 @@ const SORT_COLUMN_SQL: Record<string, string> = {
 };
 
 export class LibraryDb {
-  private readonly db: Database.Database;
+  private readonly db: SqliteDb;
 
   constructor(path: string) {
-    this.db = new Database(path);
+    this.db = new SqliteDb(path);
     migrate(this.db);
   }
 
@@ -48,7 +49,7 @@ export class LibraryDb {
   }
 
   /** Raw handle (for advanced callers / tests). */
-  get raw(): Database.Database {
+  get raw(): SqliteDb {
     return this.db;
   }
 
@@ -156,7 +157,7 @@ export class LibraryDb {
         params.push(opts.offset);
       }
     }
-    return this.db.prepare(sql).all(...params) as TrackRow[];
+    return this.db.prepare(sql).all(...params) as unknown as TrackRow[];
   }
 
   getTrack(id: number): TrackRow | undefined {
@@ -205,7 +206,7 @@ export class LibraryDb {
         `SELECT id, track_id AS trackId, type, position, length, hotcue, label, color
          FROM cues WHERE track_id = ?`,
       )
-      .all(trackId) as CueRow[];
+      .all(trackId) as unknown as CueRow[];
   }
 
   // --- Crates ---------------------------------------------------------------

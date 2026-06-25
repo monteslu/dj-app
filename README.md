@@ -19,11 +19,10 @@ The real-time sample resampler and the BPM detector run in **WASM+SIMD**, not JS
 
 ### Prerequisites
 - **Node ≥ 22** (uses npm workspaces; tested on Node 22–24).
-- **A C/C++ toolchain** — `better-sqlite3` is a native module compiled on install:
-  - Linux: `build-essential` + `python3` (`apt install build-essential python3`)
-  - macOS: Xcode Command Line Tools (`xcode-select --install`)
-  - Windows: Visual Studio Build Tools (C++ workload)
-- **No emcc needed** — the WASM (resampler, beat detector) is committed pre-built (base64-embedded
+- **No native build toolchain.** SQLite is **pure WASM** (`node-sqlite3-wasm`), so there is no
+  `node-gyp` compile and no `electron-rebuild` — the same `.wasm` runs on every OS and Electron/Node
+  ABI. No C++ compiler, Python, or Visual Studio Build Tools required.
+- **No emcc either** — the DSP WASM (resampler, beat detector) is committed pre-built (base64-embedded
   `.ts`). You only need emscripten if you change the C source in `packages/dsp-wasm/csrc/`.
 
 ### Clone and run (any computer)
@@ -32,7 +31,7 @@ The real-time sample resampler and the BPM detector run in **WASM+SIMD**, not JS
 git clone git@github.com:monteslu/dj-app.git
 cd dj-app
 npm install            # installs all workspaces (+ self-heals the Electron binary)
-npm run dev            # electron-rebuild → build renderer/worklet/main → launch
+npm run dev            # build renderer/worklet/main → launch
 ```
 
 The renderer packages are bundled from source by Vite/esbuild, so there is **no separate
@@ -45,13 +44,8 @@ The renderer packages are bundled from source by Vite/esbuild, so there is **no 
 > On a normal desktop this is harmless; remove it from `apps/desktop/package.json` if you prefer
 > the Chromium sandbox on.
 
-> **Native module ABI note (better-sqlite3):** tests run in Node; Electron needs a different ABI.
-> `dev`/`start` run `electron-rebuild` first. If `npm test`'s db tests then fail with a
-> `NODE_MODULE_VERSION` mismatch, rebuild for Node:
-> `cd node_modules/better-sqlite3 && npm run build-release`.
-
 ```bash
-npm test               # vitest across all packages
+npm test               # vitest across all packages (no native rebuild needed)
 npm run typecheck      # tsc --build across the monorepo
 ```
 
