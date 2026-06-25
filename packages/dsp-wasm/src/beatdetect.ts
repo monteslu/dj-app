@@ -9,6 +9,7 @@
  */
 
 import { beatdetectWasmBase64 } from './generated/beatdetect-wasm.js';
+import { base64ToBytes } from './base64.js';
 
 interface BeatDetectExports {
   memory: WebAssembly.Memory;
@@ -31,13 +32,7 @@ interface BeatDetectExports {
   _initialize?: () => void;
 }
 
-function base64ToBytes(b64: string): Uint8Array<ArrayBuffer> {
-  // atob works in browsers, workers, worklets AND Node ≥16 — no Node-only Buffer.
-  const bin = atob(b64);
-  const out = new Uint8Array(new ArrayBuffer(bin.length));
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
-}
+// base64 decode that works in worklet/worker/window/Node alike (no atob/Buffer).
 
 export interface BeatResult {
   bpm: number;

@@ -13,12 +13,14 @@ import { AudioSettings } from './components/AudioSettings.js';
 import { TempoFader } from './components/Faders.js';
 import { WaveformBand } from './components/WaveformBand.js';
 import { useLayoutControls, applyPrefs, getPrefs } from './layout-prefs.js';
+import { setConsoleHeight, clearConsoleHeight, applyConsoleHeight } from './panel-sizes.js';
 import { isDemo, seedDemo } from './demo.js';
 
 /**
  * Splitter — drag to resize the console (decks) vs library split. Writes the
  * console height (px) to a CSS var on .app, which the grid uses for its middle
- * row. Double-click resets to auto.
+ * row. The size persists across reloads; double-click resets to the layout
+ * preset's default.
  */
 function Splitter(): React.JSX.Element {
   const onPointerDown = (e: React.PointerEvent) => {
@@ -26,14 +28,16 @@ function Splitter(): React.JSX.Element {
     const app = (e.currentTarget as HTMLElement).closest('.app') as HTMLElement | null;
     if (!app) return;
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
+    let lastH = 0;
     const move = (ev: PointerEvent) => {
       const rect = app.getBoundingClientRect();
       // console height = pointer position minus the rows above (titlebar+waveband).
       const top = app.querySelector('.waveform-band')?.getBoundingClientRect().bottom ?? rect.top;
-      const h = Math.max(140, Math.min(rect.bottom - 120, ev.clientY) - top);
-      app.style.setProperty('--console-h', `${h}px`);
+      lastH = Math.max(140, Math.min(rect.bottom - 120, ev.clientY) - top);
+      app.style.setProperty('--console-h', `${lastH}px`);
     };
     const up = () => {
+      if (lastH > 0) setConsoleHeight(lastH); // persist the final size
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
     };
@@ -43,13 +47,14 @@ function Splitter(): React.JSX.Element {
   const reset = (e: React.MouseEvent) => {
     const app = (e.currentTarget as HTMLElement).closest('.app') as HTMLElement | null;
     app?.style.removeProperty('--console-h');
+    clearConsoleHeight(); // back to the preset default
   };
   return (
     <div
       className="splitter"
       onPointerDown={onPointerDown}
       onDoubleClick={reset}
-      title="Drag to resize decks vs library · double-click to reset"
+      title="Drag to resize decks vs library · double-click to reset to the preset"
       role="separator"
       aria-label="Resize decks and library"
     >
@@ -109,6 +114,8 @@ function Stage(): React.JSX.Element {
       if (getPrefs().density !== qd) toggleDensity();
     }
     applyPrefs(getPrefs());
+    const app = document.querySelector('.app') as HTMLElement | null;
+    if (app) applyConsoleHeight(app); // restore the persisted splitter size
   }, [setPreset, toggleDensity]);
 
   useEffect(() => {

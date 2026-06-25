@@ -66,6 +66,21 @@ export default tseslint.config(
     },
   },
   {
+    // dsp-wasm loads its WASM INSIDE the AudioWorklet, whose scope lacks atob/btoa
+    // (and Buffer). Ban them here so the "atob is not defined" worklet crash can't
+    // recur — use the globals-free base64.ts decoder instead.
+    files: ['packages/dsp-wasm/src/**/*.ts'],
+    ignores: ['**/*.test.ts'],
+    rules: {
+      'no-restricted-globals': [
+        'error',
+        { name: 'atob', message: 'Not available in AudioWorklet. Use base64ToBytes() from ./base64.js.' },
+        { name: 'btoa', message: 'Not available in AudioWorklet.' },
+        { name: 'Buffer', message: 'Node-only. Use base64ToBytes() from ./base64.js.' },
+      ],
+    },
+  },
+  {
     // WEB-ONLY code: shared packages + the renderer must stay web-standard so
     // they run in the browser/worker/worklet. Electron is for file access in the
     // MAIN process only; everything else should not depend on Node. Ban Node

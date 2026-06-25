@@ -9,6 +9,7 @@
  */
 
 import { resamplerWasmBase64 } from './generated/resampler-wasm.js';
+import { base64ToBytes } from './base64.js';
 
 interface ResamplerExports {
   memory: WebAssembly.Memory;
@@ -31,17 +32,6 @@ interface ResamplerExports {
   resampler_last_position(): number;
   resampler_last_produced(): number;
   _initialize?: () => void;
-}
-
-function base64ToBytes(b64: string): Uint8Array<ArrayBuffer> {
-  // atob is a global in browsers, workers, worklets AND Node ≥16 — no Buffer
-  // (which is Node-only and crashes the renderer). Pure typed-array decode.
-  const bin = atob(b64);
-  const out = new Uint8Array(new ArrayBuffer(bin.length));
-  for (let i = 0; i < bin.length; i++) {
-    out[i] = bin.charCodeAt(i);
-  }
-  return out;
 }
 
 /** The play-state + loop-state a pull needs. */
