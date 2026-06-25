@@ -71,10 +71,11 @@ body,
 }
 
 .app {
-  /* --console-h is set by the Splitter drag; defaults to a flexible share. The
-     console (decks+mixer) is information-dense but fixed-ish in what it needs, so
-     it gets a smaller share and the library (song list) gets the rest. */
-  --console-h: minmax(180px, 0.7fr);
+  /* Console sizes to its CONTENT (decks show every control, never clipped), and
+     the library takes ALL remaining space. The Splitter drag can still override
+     --console-h. Previously this was an `fr` share that fought the deck's natural
+     height and either clipped the pads or ballooned the console. */
+  --console-h: auto;
   /* library row min/ratio — presets tune these. */
   --library-min: 120px;
   --library-fr: 1fr;
@@ -95,12 +96,13 @@ body,
    performance = balanced (default); library = bigger browser; minimal = decks
    take the room, browser shrinks to a strip. */
 .app[data-layout='performance'] {
-  --console-h: minmax(180px, 0.7fr);
-  --library-fr: 1.3fr;
+  --console-h: auto;
+  --library-fr: 1fr;
 }
 .app[data-layout='library'] {
-  --console-h: minmax(200px, 0.7fr);
-  --library-fr: 1.6fr;
+  --console-h: auto;
+  --library-fr: 1fr;
+  --library-min: 280px;
 }
 .app[data-layout='minimal'] {
   --console-h: minmax(240px, 1.5fr);
@@ -292,10 +294,9 @@ body,
      the web-native win Mixxx's fixed skins can't do. */
   container-type: inline-size;
   container-name: deck;
-  /* scroll the deck's own controls when the console is short, instead of
-     clipping them out of reach (the bug: controls vanished at low height). */
-  overflow-y: auto;
-  overflow-x: hidden;
+  /* Show ALL deck controls — never clip/scroll them. The console row sizes to
+     content (--console-h: auto), so the deck has the height it needs. */
+  overflow: visible;
   box-shadow: var(--shadow), var(--shadow-inset);
   position: relative;
 }
@@ -629,7 +630,9 @@ body,
 /* ── hotcues ──────────────────────────────────────────────── */
 .hotcue-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* 8 pads in ONE row (was repeat(4) = two rows, doubling deck height and eating
+     the song list). Narrow decks drop back to 4-across via the container query. */
+  grid-template-columns: repeat(8, 1fr);
   gap: 4px;
 }
 .hotcue-pad {
