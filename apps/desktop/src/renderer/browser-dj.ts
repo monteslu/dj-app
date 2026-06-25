@@ -20,9 +20,12 @@ function track(
     bpm, firstBeatFrame: 0, key, rating: 0, timesPlayed: 0, filetype: 'wav',
   };
 }
-const DEMO_TRACKS: LibTrack[] = [
-  track(1, 'Com Truise', 'Flightwave', 'In Decay', 'Synthwave', 128, '8A', 372),
-  track(2, 'Bonobo', 'Kerala', 'Migration', 'Electronic', 122, '5A', 314),
+// The first two map to real MP3s served at /mp3/<file> (vite.browser serveMusic),
+// so the web build + e2e exercise actual decode/analysis/scrolling waveforms. The
+// rest are synthetic. mp3File!=null marks the real ones.
+const DEMO_TRACKS: Array<LibTrack & { mp3File?: string }> = [
+  { ...track(1, 'The Who', "I Can't Explain", '', 'Rock', 0, '', 125), mp3File: "The Who - I Can't Explain.mp3" },
+  { ...track(2, 'Bill Withers', "Ain't No Sunshine", '', 'Soul', 0, '', 125), mp3File: 'Bill Withers - Ain\'t No Sunshine.mp3' },
   track(3, 'Tycho', 'Awake', 'Awake', 'Ambient', 115, '11B', 320),
   track(4, 'Jon Hopkins', 'Emerald Rush', 'Singularity', 'Techno', 126, '4A', 365),
 ];
@@ -65,17 +68,24 @@ function synthWav(seconds: number, bpm: number, sampleRate = 48000): ArrayBuffer
 export function makeBrowserDj(): DjApi {
   const lib = new Map(DEMO_TRACKS.map((t) => [t.id, t]));
 
-  const fileFor = (t: LibTrack): LoadedFile => ({
-    name: t.filename,
-    path: t.location,
-    data: synthWav(Math.min(t.duration ?? 30, 30), t.bpm || 120),
-  });
+  // Real MP3 (served at /mp3/<file>) when the track has one, else a synth tone.
+  const fileFor = async (t: LibTrack & { mp3File?: string }): Promise<LoadedFile> => {
+    if (t.mp3File) {
+      try {
+        const res = await fetch(`/mp3/${encodeURIComponent(t.mp3File)}`);
+        if (res.ok) return { name: t.mp3File, path: t.location, data: await res.arrayBuffer() };
+      } catch {
+        /* fall through to synth */
+      }
+    }
+    return { name: t.filename, path: t.location, data: synthWav(Math.min(t.duration ?? 30, 30), t.bpm || 120) };
+  };
 
   return {
     openTrack: async () => fileFor(DEMO_TRACKS[0]!),
     readTrack: async (path: string) => {
       const t = [...lib.values()].find((x) => x.location === path) ?? DEMO_TRACKS[0]!;
-      return fileFor(t);
+      return fileFor(t as LibTrack & { mp3File?: string });
     },
     libraryQuery: async (q: LibQuery) => {
       const s = (q.search ?? '').toLowerCase();
@@ -91,7 +101,7 @@ export function makeBrowserDj(): DjApi {
     onScanProgress: (_cb: (p: ScanProgress) => void) => () => {},
     readTrackById: async (id: number) => {
       const t = lib.get(id);
-      return t ? fileFor(t) : null;
+      return t ? fileFor(t as LibTrack & { mp3File?: string }) : null;
     },
     librarySetAnalysis: async () => {},
     libraryWaveform: async () => null,

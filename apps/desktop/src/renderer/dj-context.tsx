@@ -24,6 +24,7 @@ import { startPerfMonitor } from './perf-monitor.js';
 import { onFrame } from './frame-loop.js';
 import { ControllerService } from './controller-service.js';
 import { RecordingService } from './recording-service.js';
+import { loadTrackToDeck } from './track-loader.js';
 
 export const NUM_DECKS = 2;
 // 2 decks each carry 36 hotcues × 6 keys + loops + beatloops, so the surface is
@@ -87,8 +88,14 @@ function buildRuntime(): {
   const recording = new RecordingService(engine);
   const runtime = { bus, engine, analysis, analysisQueue, controllers, recording };
   // Expose the runtime for e2e/debugging (drive sync, read positions, inspect the
-  // bus from the page). Harmless in prod; invaluable for the Playwright loop.
-  (globalThis as Record<string, unknown>).__dj = runtime;
+  // bus from the page). Harmless in prod; invaluable for the Playwright loop. The
+  // loadToDeck helper uses the REAL load pipeline (decode → peaks → engine), so
+  // tests exercise exactly what the UI does.
+  (globalThis as Record<string, unknown>).__dj = {
+    ...runtime,
+    loadToDeck: (deckIndex: number, file: { name: string; data: ArrayBuffer }) =>
+      loadTrackToDeck({ engine, bus, analysis }, deckIndex, { file }),
+  };
   return runtime;
 }
 

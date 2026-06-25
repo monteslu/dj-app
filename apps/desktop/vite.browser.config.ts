@@ -31,6 +31,32 @@ function serveWorklets(): Plugin {
   };
 }
 
+// Serve real MP3s from ~/Music/mp3 at /mp3/<name> so the web build + e2e can test
+// with actual tracks (decode, BPM/key analysis, scrolling waveforms), not just
+// synthetic tones. Opt-in: only active when DJ_MUSIC_DIR is set (defaults to
+// ~/Music/mp3 if present). Dev-only; never shipped.
+function serveMusic(): Plugin {
+  const dir = process.env.DJ_MUSIC_DIR || `${process.env.HOME}/Music/mp3`;
+  return {
+    name: 'serve-music',
+    configureServer(server) {
+      server.middlewares.use(async (req, res, next) => {
+        if (!req.url?.startsWith('/mp3/')) return next();
+        try {
+          const name = decodeURIComponent(req.url.slice('/mp3/'.length));
+          if (name.includes('..')) return next();
+          const body = await readFile(`${dir}/${name}`);
+          res.setHeader('Content-Type', 'audio/mpeg');
+          res.end(body);
+        } catch {
+          res.statusCode = 404;
+          res.end('not found');
+        }
+      });
+    },
+  };
+}
+
 const pkg = (name: string) =>
   fileURLToPath(new URL(`../../packages/${name}/src/index.ts`, import.meta.url));
 
@@ -48,7 +74,7 @@ export default defineConfig({
       new Date().toISOString().slice(11, 19) + ' ' + new Date().toISOString().slice(5, 10),
     ),
   },
-  plugins: [react(), serveWorklets()],
+  plugins: [react(), serveWorklets(), serveMusic()],
   resolve: {
     alias: {
       '@internal-dj/analysis/worker': fileURLToPath(

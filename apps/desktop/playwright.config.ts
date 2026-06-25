@@ -19,7 +19,14 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         launchOptions: {
-          args: ['--use-angle=gl', '--enable-unsafe-webgpu', '--enable-features=Vulkan'],
+          args: [
+            '--use-angle=gl',
+            '--enable-unsafe-webgpu',
+            '--enable-features=Vulkan',
+            // let the AudioContext + worklet run without a user gesture, so e2e can
+            // actually start playback (position advances, waves scroll).
+            '--autoplay-policy=no-user-gesture-required',
+          ],
         },
       },
     },
