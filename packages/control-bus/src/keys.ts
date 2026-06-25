@@ -201,6 +201,7 @@ export function beatloopActivateKey(size: number): Key {
 // ---------------------------------------------------------------------------
 
 export const MasterKeys = {
+  sampleRate: 'samplerate', // the AudioContext sample rate (set by the engine)
   crossfader: 'crossfader', // -1..1
   crossfaderCurve: 'xFaderCurve',
   crossfaderReverse: 'xFaderReverse',

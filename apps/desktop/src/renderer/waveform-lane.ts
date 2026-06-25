@@ -6,7 +6,7 @@
  */
 
 import { WaveformGL, drawScrolling, DEFAULT_COLORS } from '@internal-dj/waveform';
-import { deck as deckGroup, DeckKeys, type ControlBus } from '@internal-dj/control-bus';
+import { deck as deckGroup, DeckKeys, MASTER, MasterKeys, type ControlBus } from '@internal-dj/control-bus';
 import { getDeckTrack } from './deck-state.js';
 import { reportLaneDraw } from './perf-monitor.js';
 
@@ -58,8 +58,11 @@ export class WaveformLaneController {
       const frames = this.bus.get(g, DeckKeys.trackSamples);
       const fraction = this.bus.get(g, DeckKeys.playPosition);
       const fileBpm = this.bus.get(g, DeckKeys.fileBpm);
-      // framesPerBeat in SOURCE frames (for drawing the grid against source peaks).
-      const framesPerBeat = fileBpm > 0 ? (60 / fileBpm) * SR : 0;
+      // Use the REAL sample rate (positions + firstBeatFrame are in decoded frames
+      // at the AudioContext rate); a hardcoded 48000 drifts the grid when the
+      // context runs at 44100, so synced grids wouldn't line up.
+      const sr = this.bus.get(MASTER, MasterKeys.sampleRate) || SR;
+      const framesPerBeat = fileBpm > 0 ? (60 / fileBpm) * sr : 0;
       const fbf = this.bus.get(g, DeckKeys.firstBeatFrame);
 
       // Beat-relative zoom: one beat = PIXELS_PER_BEAT pixels, ALWAYS. A track beat

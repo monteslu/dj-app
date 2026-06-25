@@ -47,6 +47,12 @@ app.setName('dj-app');
 if (process.platform === 'linux' && process.env.DJ_NATIVE_GPU !== '1') {
   app.commandLine.appendSwitch('disable-gpu-memory-buffer-compositor-resources');
   app.commandLine.appendSwitch('disable-features', 'CanvasOopRasterization');
+  // The memory-buffer switches alone DON'T stop the crash on this driver (the
+  // OzoneImageBacking failure is deeper). --disable-gpu-compositing moves the UI
+  // COMPOSITING to the CPU, bypassing the broken native-pixmap/SharedImage path
+  // entirely. Our WebGL waveform still runs on the GPU; only the page compositor
+  // changes. This is the reliable stop for the crash-loop. (Verified switch.)
+  app.commandLine.appendSwitch('disable-gpu-compositing');
 }
 
 // NOTE: the Wayland-vs-X11 display backend is selected via the

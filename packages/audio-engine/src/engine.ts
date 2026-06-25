@@ -123,6 +123,10 @@ export class Engine {
       this.installQuickEffect(d, ctx, deckGroup(d + 1));
     }
 
+    // Publish the real AudioContext sample rate so the waveform grid math uses it
+    // (not a hardcoded 48000) — wrong SR drifts the beat grid out of alignment.
+    this.bus.set(MASTER, MasterKeys.sampleRate, ctx.sampleRate);
+
     // Beat sync: phase-lock on SYNC + publish beat distances. Created before the
     // Smart Fader so the latter can reuse its phase-align on activate.
     this.syncController = new SyncController({

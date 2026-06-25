@@ -51,9 +51,26 @@ function buildRuntime(): {
   controllers: ControllerService;
   recording: RecordingService;
 } {
+  // Persist `persist:true` controls (keylock, smart fader, crossfader curve, etc.)
+  // to localStorage so they survive restarts.
+  const PERSIST_KEY = 'dj-controls';
+  let persisted: Record<string, number> = {};
+  try {
+    persisted = JSON.parse(localStorage.getItem(PERSIST_KEY) ?? '{}');
+  } catch {
+    persisted = {};
+  }
   const bus = new ControlBus({
     sab: { capacity: SAB_CAPACITY },
-    // M1: persistence is in-memory only (no disk yet). Wire to electron-store later.
+    persistedValues: persisted,
+    onPersist: (id, value) => {
+      persisted[id] = value;
+      try {
+        localStorage.setItem(PERSIST_KEY, JSON.stringify(persisted));
+      } catch {
+        /* quota / unavailable */
+      }
+    },
   });
   bus.defineAll(standardControls(NUM_DECKS));
 
