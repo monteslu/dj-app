@@ -56,21 +56,31 @@ void main() {
   vec3 col = mix(vec3(0.024,0.035,0.055), vec3(0.047,0.063,0.086), vign);
 
   if (frame >= 0.0) {
-    float b = floor(frame / u_framesPerBucket);
-    if (b >= 0.0 && b < u_texLen) {
-      // buckets are packed row-major into a 2D texture (1D would exceed
-      // MAX_TEXTURE_SIZE for long tracks). Recover the (col,row) for bucket b.
-      float tw = u_texSize.x;
-      float tcol = mod(b, tw);
-      float trow = floor(b / tw);
-      vec2 uv = vec2((tcol + 0.5) / tw, (trow + 0.5) / u_texSize.y);
-      vec4 t = texture2D(u_tex, uv);                     // rgb=bands, a=amp
-      float amp = t.a;
-      float barH = amp * mid * 0.92;
-      if (abs(y - mid) <= barH) {
-        col = bandColor(t.rgb);
-        if (x < centerX) col *= 0.5;                       // played = dimmed
-      }
+    float tw = u_texSize.x;
+    float th = u_texSize.y;
+    // Read the two adjacent buckets from the 2D-packed texture and blend them
+    // ourselves (NEAREST filtering; GPU LINEAR would bleed across row wraps).
+    float bF = frame / u_framesPerBucket;     // fractional bucket index
+    float b0 = floor(bF);
+    float b1 = b0 + 1.0;
+    float f = bF - b0;                        // 0..1 blend between the two buckets
+    vec4 t0 = vec4(0.0);
+    vec4 t1 = vec4(0.0);
+    if (b0 >= 0.0 && b0 < u_texLen) {
+      t0 = texture2D(u_tex, vec2((mod(b0, tw) + 0.5) / tw, (floor(b0 / tw) + 0.5) / th));
+    }
+    if (b1 >= 0.0 && b1 < u_texLen) {
+      t1 = texture2D(u_tex, vec2((mod(b1, tw) + 0.5) / tw, (floor(b1 / tw) + 0.5) / th));
+    }
+    // LINEAR blend between adjacent buckets → the bar height changes SMOOTHLY as
+    // the playhead scrolls sub-bucket, instead of snapping (which looked like the
+    // wave "changing shape" every frame). The peaks are static (uploaded once); we
+    // only smooth the read.
+    vec4 t = mix(t0, t1, f);
+    float barH = t.a * mid * 0.92;
+    if (abs(y - mid) <= barH) {
+      col = bandColor(t.rgb);
+      if (x < centerX) col *= 0.5;                         // played = dimmed
     }
   }
 
