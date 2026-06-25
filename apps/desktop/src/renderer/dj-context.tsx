@@ -85,7 +85,11 @@ function buildRuntime(): {
   const analysisQueue = new AnalysisQueue(engine, analysis);
   const controllers = new ControllerService(bus);
   const recording = new RecordingService(engine);
-  return { bus, engine, analysis, analysisQueue, controllers, recording };
+  const runtime = { bus, engine, analysis, analysisQueue, controllers, recording };
+  // Expose the runtime for e2e/debugging (drive sync, read positions, inspect the
+  // bus from the page). Harmless in prod; invaluable for the Playwright loop.
+  (globalThis as Record<string, unknown>).__dj = runtime;
+  return runtime;
 }
 
 export function DjProvider({ children }: { children: ReactNode }): React.JSX.Element {
