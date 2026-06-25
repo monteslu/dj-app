@@ -21,7 +21,7 @@ void main() { gl_Position = vec4(a_pos, 0.0, 1.0); }
 const FRAG = `
 precision highp float;
 uniform vec2  u_res;          // canvas size (px)
-uniform sampler2D u_tex;      // peaks, length in u_texLen
+uniform sampler2D u_tex;      // RGB = low/mid/high band peaks; A = overall amp
 uniform float u_texLen;       // number of peak buckets
 uniform float u_framesPerBucket;
 uniform float u_positionFrames;
@@ -29,11 +29,16 @@ uniform float u_framesPerPx;
 uniform float u_firstBeat;    // grid phase (frames)
 uniform float u_framesPerBeat;// 0 = no grid
 
-vec3 ampColor(float a) {
-  // low → teal/blue, high → warm (matches the Canvas2D palette)
-  vec3 lo = mix(vec3(0.12,0.47,0.86), vec3(0.20,0.90,0.51), clamp(a/0.5,0.0,1.0));
-  vec3 hi = mix(vec3(0.20,0.90,0.51), vec3(0.98,0.66,0.16), clamp((a-0.5)/0.5,0.0,1.0));
-  return a < 0.5 ? lo : hi;
+// frequency-band color: low=red/warm, mid=green, high=blue (rekordbox/Serato/
+// Mixxx convention). Blend the three band energies into one RGB color.
+vec3 bandColor(vec3 lmh) {
+  vec3 lowC  = vec3(1.00, 0.27, 0.20);  // bass → red
+  vec3 midC  = vec3(0.25, 0.90, 0.40);  // mids → green
+  vec3 highC = vec3(0.30, 0.62, 1.00);  // highs → blue
+  vec3 c = lowC * lmh.r + midC * lmh.g + highC * lmh.b;
+  float m = max(lmh.r, max(lmh.g, lmh.b));
+  // normalize toward the dominant band so quiet sums don't go grey/dark
+  return m > 0.001 ? c / m : c;
 }
 
 void main() {
@@ -53,11 +58,12 @@ void main() {
     float b = floor(frame / u_framesPerBucket);
     if (b >= 0.0 && b < u_texLen) {
       float u = (b + 0.5) / u_texLen;
-      float amp = texture2D(u_tex, vec2(u, 0.5)).r;        // 0..1
+      vec4 t = texture2D(u_tex, vec2(u, 0.5));            // rgb=bands, a=amp
+      float amp = t.a;
       float half = amp * mid * 0.92;
       if (abs(y - mid) <= half) {
-        col = ampColor(amp);
-        if (x < centerX) col *= 0.45;                       // played = dimmed
+        col = bandColor(t.rgb);
+        if (x < centerX) col *= 0.5;                       // played = dimmed
       }
     }
   }
@@ -178,17 +184,35 @@ export class WaveformGL {
     }
   }
 
-  /** Upload peaks (one Uint8 per bucket) as a luminance texture. Once per track. */
-  setPeaks(peaks: Uint8Array, framesPerBucket: number): void {
+  /**
+   * Upload band peaks as an RGBA texture (R=low, G=mid, B=high, A=overall amp),
+   * one texel per bucket. Once per track. If the band arrays are absent we fall
+   * back to amplitude in all channels (monochrome-ish).
+   */
+  setPeaks(
+    peaks: Uint8Array,
+    framesPerBucket: number,
+    low?: Uint8Array,
+    mid?: Uint8Array,
+    high?: Uint8Array,
+  ): void {
     if (!this.ok) return;
     const gl = this.gl;
-    this.texLen = peaks.length;
+    const n = peaks.length;
+    this.texLen = n;
     this.framesPerBucket = framesPerBucket;
+    const rgba = new Uint8Array(n * 4);
+    for (let i = 0; i < n; i++) {
+      rgba[i * 4 + 0] = low ? low[i]! : peaks[i]!;
+      rgba[i * 4 + 1] = mid ? mid[i]! : peaks[i]!;
+      rgba[i * 4 + 2] = high ? high[i]! : peaks[i]!;
+      rgba[i * 4 + 3] = peaks[i]!;
+    }
     gl.bindTexture(gl.TEXTURE_2D, this.tex);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.texImage2D(
-      gl.TEXTURE_2D, 0, gl.LUMINANCE, peaks.length, 1, 0,
-      gl.LUMINANCE, gl.UNSIGNED_BYTE, peaks,
+      gl.TEXTURE_2D, 0, gl.RGBA, n, 1, 0,
+      gl.RGBA, gl.UNSIGNED_BYTE, rgba,
     );
   }
 

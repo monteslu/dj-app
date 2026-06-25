@@ -43,7 +43,7 @@ self.onmessage = (e: MessageEvent<AnalyzeRequest>) => {
   // thread sample loops that would hiccup live audio.
   if (msg.computePeaks) {
     const buckets = msg.detailBuckets ?? detailBucketsForDuration(msg.frames / msg.sampleRate);
-    const peaks = computePeakSet(channels, msg.frames, buckets);
+    const peaks = computePeakSet(channels, msg.frames, buckets, msg.sampleRate);
     res.overviewPeaks = peaks.overview.peaks;
     res.detailPeaks = peaks.detail.peaks;
     res.detailFramesPerBucket = peaks.detail.framesPerBucket;

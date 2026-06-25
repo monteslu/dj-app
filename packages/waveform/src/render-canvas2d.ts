@@ -81,12 +81,18 @@ export function drawOverview(
 
   const playedX = Math.round(positionFraction * w);
   const n = peaks.length;
+  const hasBands = !!(peaks.low && peaks.mid && peaks.high);
 
   for (let x = 0; x < w; x++) {
     // map canvas column → peak bucket
     const b = Math.min(n - 1, Math.floor((x / w) * n));
     const amp = (peaks.peaks[b]! / 255) * mid;
-    ctx.strokeStyle = x <= playedX ? colors.played : colors.wave;
+    if (hasBands) {
+      // frequency color: low=red, mid=green, high=blue, normalized to dominant
+      ctx.strokeStyle = bandColorCss(peaks.low![b]!, peaks.mid![b]!, peaks.high![b]!, x <= playedX);
+    } else {
+      ctx.strokeStyle = x <= playedX ? colors.played : colors.wave;
+    }
     ctx.beginPath();
     ctx.moveTo(x + 0.5, mid - amp);
     ctx.lineTo(x + 0.5, mid + amp);
@@ -134,6 +140,20 @@ export function drawOverview(
  * the waveform reads as colorful + alive rather than a flat monochrome block.
  * `played` dims/desaturates the already-played portion.
  */
+/** Frequency-band color (low=red, mid=green, high=blue), normalized + dimmed. */
+function bandColorCss(low: number, mid: number, high: number, played: boolean): string {
+  const m = Math.max(low, mid, high, 1);
+  const wl = low / m,
+    wm = mid / m,
+    wh = high / m;
+  const dim = played ? 0.5 : 1;
+  // anchor colors: low #ff451a, mid #40e628, high #4d9eff
+  const r = Math.min(255, (wl * 255 + wm * 64 + wh * 77) * dim) | 0;
+  const g = Math.min(255, (wl * 69 + wm * 230 + wh * 158) * dim) | 0;
+  const b = Math.min(255, (wl * 51 + wm * 102 + wh * 255) * dim) | 0;
+  return `rgb(${r},${g},${b})`;
+}
+
 // Precomputed color palette (built once). Changing ctx.fillStyle per pixel +
 // allocating an rgb() string per pixel was the cause of choppy waveform playback
 // (~1000 string allocs + 1000 GPU state flushes per frame). Instead we quantize

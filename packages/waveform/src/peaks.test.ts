@@ -54,3 +54,41 @@ describe('detailBucketsForDuration', () => {
     expect(detailBucketsForDuration(0)).toBe(1); // min 1
   });
 });
+
+import { computeBandPeaks } from './peaks.js';
+
+describe('computeBandPeaks (frequency split for coloring)', () => {
+  const SR = 44100;
+  function tone(hz: number, secs: number): Float32Array {
+    const n = Math.floor(secs * SR);
+    const a = new Float32Array(n);
+    for (let i = 0; i < n; i++) a[i] = Math.sin((2 * Math.PI * hz * i) / SR) * 0.8;
+    return a;
+  }
+  function avg(arr: Uint8Array): number {
+    let s = 0;
+    for (const v of arr) s += v;
+    return s / arr.length;
+  }
+
+  it('a bass tone lights the LOW band most', () => {
+    const a = tone(60, 1); // 60 Hz
+    const p = computeBandPeaks([a, a], a.length, 200, SR);
+    expect(avg(p.low!)).toBeGreaterThan(avg(p.mid!));
+    expect(avg(p.low!)).toBeGreaterThan(avg(p.high!));
+  });
+
+  it('a treble tone lights the HIGH band most', () => {
+    const a = tone(8000, 1); // 8 kHz
+    const p = computeBandPeaks([a, a], a.length, 200, SR);
+    expect(avg(p.high!)).toBeGreaterThan(avg(p.low!));
+  });
+
+  it('produces low/mid/high arrays the right length', () => {
+    const a = tone(440, 0.5);
+    const p = computeBandPeaks([a, a], a.length, 128, SR);
+    expect(p.low!.length).toBe(p.length);
+    expect(p.mid!.length).toBe(p.length);
+    expect(p.high!.length).toBe(p.length);
+  });
+});

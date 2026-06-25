@@ -49,8 +49,9 @@ export class WaveformLaneController {
     if (st.peaks) {
       // upload peaks to the GPU only when the track changes
       if (this.uploaded !== st.peaks.detail.peaks) {
-        this.gl.setPeaks(st.peaks.detail.peaks, st.peaks.detail.framesPerBucket);
-        this.uploaded = st.peaks.detail.peaks;
+        const d = st.peaks.detail;
+        this.gl.setPeaks(d.peaks, d.framesPerBucket, d.low, d.mid, d.high);
+        this.uploaded = d.peaks;
       }
       const g = this.group;
       const frames = this.bus.get(g, DeckKeys.trackSamples);

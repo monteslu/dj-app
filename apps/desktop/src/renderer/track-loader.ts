@@ -63,7 +63,12 @@ export async function loadTrackToDeck(
     channels.push(all.subarray(c * decoded.frames, (c + 1) * decoded.frames));
   }
   const dur = decoded.frames / decoded.sampleRate;
-  const peaks = computePeakSet(channels, decoded.frames, detailBucketsForDuration(dur));
+  const peaks = computePeakSet(
+    channels,
+    decoded.frames,
+    detailBucketsForDuration(dur),
+    decoded.sampleRate,
+  );
 
   const m = src.meta ?? {};
   const title = m.title ?? src.file.name.replace(/\.[^.]+$/, '');

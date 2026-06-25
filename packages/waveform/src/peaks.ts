@@ -16,6 +16,12 @@ export interface PeakData {
   length: number;
   /** Per-bucket max-abs amplitude, 0..255. */
   peaks: Uint8Array;
+  /** Per-bucket LOW-band peak, 0..255 (interleaved with peaks for coloring). */
+  low?: Uint8Array;
+  /** Per-bucket MID-band peak, 0..255. */
+  mid?: Uint8Array;
+  /** Per-bucket HIGH-band peak, 0..255. */
+  high?: Uint8Array;
   /** Source frames per bucket (the reduction ratio). */
   framesPerBucket: number;
   /** Total source frames this was computed from. */
@@ -64,6 +70,82 @@ export function computePeaks(
 }
 
 /**
+ * 3-band peak buckets (low/mid/high) for frequency-colored waveforms (the
+ * Mixxx/rekordbox/Serato look: bass=red, mids=green, highs=blue). Splits the mono
+ * mix into bands with cheap one-pole filters, then max-abs buckets each band.
+ * Returns a PeakData whose `peaks` is the overall amplitude and `low/mid/high`
+ * are the per-band peaks. Runs in the analysis worker (it iterates every sample).
+ *
+ * Bands (one-pole crossovers, approximate): low < ~250Hz, high > ~2.5kHz, mid in
+ * between. Good enough for coloring; not a mastering EQ.
+ */
+export function computeBandPeaks(
+  channelData: Float32Array[],
+  frames: number,
+  buckets: number,
+  sampleRate = 44100,
+): PeakData {
+  const numBuckets = Math.max(1, Math.min(buckets, frames));
+  const framesPerBucket = frames / numBuckets;
+  const channels = channelData.length;
+  const all = new Uint8Array(numBuckets);
+  const low = new Uint8Array(numBuckets);
+  const mid = new Uint8Array(numBuckets);
+  const high = new Uint8Array(numBuckets);
+
+  // one-pole coefficients for the two crossover corners
+  const aLow = Math.exp((-2 * Math.PI * 250) / sampleRate); // LP @250Hz
+  const aHigh = Math.exp((-2 * Math.PI * 2500) / sampleRate); // LP @2.5kHz (for HP via diff)
+  let lpLow = 0; // running low-pass (low band)
+  let lpHigh = 0; // running low-pass @2.5k (everything below highs)
+
+  let b = 0;
+  let bucketEnd = Math.floor(framesPerBucket);
+  let pAll = 0, pLow = 0, pMid = 0, pHigh = 0;
+
+  for (let i = 0; i < frames; i++) {
+    // mono mix
+    let s = 0;
+    for (let c = 0; c < channels; c++) s += channelData[c]![i]!;
+    s /= channels;
+
+    lpLow = aLow * lpLow + (1 - aLow) * s;
+    lpHigh = aHigh * lpHigh + (1 - aHigh) * s;
+    const lowB = lpLow;
+    const highB = s - lpHigh; // above 2.5k
+    const midB = lpHigh - lpLow; // 250..2.5k
+
+    const aA = s < 0 ? -s : s;
+    const aL = lowB < 0 ? -lowB : lowB;
+    const aM = midB < 0 ? -midB : midB;
+    const aH = highB < 0 ? -highB : highB;
+    if (aA > pAll) pAll = aA;
+    if (aL > pLow) pLow = aL;
+    if (aM > pMid) pMid = aM;
+    if (aH > pHigh) pHigh = aH;
+
+    if (i >= bucketEnd && b < numBuckets) {
+      all[b] = Math.min(255, Math.round(pAll * 255));
+      low[b] = Math.min(255, Math.round(pLow * 255));
+      mid[b] = Math.min(255, Math.round(pMid * 2 * 255)); // mids read quieter; lift
+      high[b] = Math.min(255, Math.round(pHigh * 3 * 255)); // highs quieter still
+      b++;
+      bucketEnd = Math.floor((b + 1) * framesPerBucket);
+      pAll = pLow = pMid = pHigh = 0;
+    }
+  }
+  // flush last bucket
+  if (b < numBuckets) {
+    all[b] = Math.min(255, Math.round(pAll * 255));
+    low[b] = Math.min(255, Math.round(pLow * 255));
+    mid[b] = Math.min(255, Math.round(pMid * 2 * 255));
+    high[b] = Math.min(255, Math.round(pHigh * 3 * 255));
+  }
+
+  return { length: numBuckets, peaks: all, low, mid, high, framesPerBucket, frames };
+}
+
+/**
  * Compute both resolutions in one pass-ish: a detailed view at `detailBuckets`
  * (used for the zoomed scrolling waveform) and an overview at OVERVIEW_BUCKETS.
  * For M1 we just compute each independently; the detailed view is derived from
@@ -73,10 +155,12 @@ export function computePeakSet(
   channelData: Float32Array[],
   frames: number,
   detailBuckets: number,
+  sampleRate = 44100,
 ): { detail: PeakData; overview: PeakData } {
+  // 3-band peaks for frequency-colored waveforms (Mixxx/rekordbox look).
   return {
-    detail: computePeaks(channelData, frames, detailBuckets),
-    overview: computePeaks(channelData, frames, OVERVIEW_BUCKETS),
+    detail: computeBandPeaks(channelData, frames, detailBuckets, sampleRate),
+    overview: computeBandPeaks(channelData, frames, OVERVIEW_BUCKETS, sampleRate),
   };
 }
 

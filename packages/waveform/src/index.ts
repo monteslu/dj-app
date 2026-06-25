@@ -5,6 +5,7 @@
 
 export {
   computePeaks,
+  computeBandPeaks,
   computePeakSet,
   detailBucketsForDuration,
   OVERVIEW_BUCKETS,
