@@ -22,6 +22,25 @@
   --radius: 10px;
   --shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
   --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+
+  /* Fluid UI scale. `--u` is a multiplier (≈0.85 on a small laptop → ≈1.15 on a
+     big display) derived from the viewport, clamped to a sane band so nothing
+     ever gets absurdly tiny or huge. Control sizes are expressed in terms of it,
+     so the whole console scales together instead of clipping. Beyond Mixxx's
+     fixed skins: one fluid system, no per-size skin files.
+     0.6px per vmin, floored/ceiled via clamp. */
+  --u: clamp(0.82, 0.5px + 0.42vmin, 1.18);
+
+  /* density multiplier (toggled: compact vs comfortable). 1 = comfortable. */
+  --density: 1;
+
+  /* derived control dimensions (use these, not raw px) */
+  --knob-sm: calc(28px * var(--u) * var(--density));
+  --knob-lg: calc(46px * var(--u) * var(--density));
+  --fader-h: clamp(96px, 18vh, 210px);
+  --fader-w: calc(22px * var(--u));
+  --pad: calc(9px * var(--u) * var(--density));
+  --gap: calc(8px * var(--u) * var(--density));
 }
 
 * {
@@ -37,10 +56,18 @@ body,
   color: var(--text);
   font-family:
     'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  font-size: 14px;
+  font-size: calc(13px * var(--u));
   user-select: none;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
+}
+
+/* Reasonable floor: at/above ~1080×640 the console fits without overflow; below
+   that the app scrolls rather than crushing controls into unusable slivers. */
+#root {
+  min-width: 1080px;
+  min-height: 640px;
+  overflow: auto;
 }
 
 .app {
@@ -752,8 +779,8 @@ body,
   gap: 0;
 }
 .chan .knob svg {
-  width: 28px;
-  height: 28px;
+  width: var(--knob-sm);
+  height: var(--knob-sm);
 }
 .chan .knob-label {
   font-size: 8px;
@@ -768,8 +795,8 @@ body,
    so it never collapses or runs off-screen. */
 .chan-fader {
   flex: 0 0 auto;
-  height: clamp(110px, 19vh, 200px);
-  width: 22px;
+  height: var(--fader-h);
+  width: var(--fader-w);
 }
 /* center VU meters between the strips; bottom-aligned so they line up with the
    bottoms of the channel faders regardless of the PFL/knob row heights. */
@@ -780,7 +807,7 @@ body,
   align-self: end;
 }
 .mixer-vus .vu-meter {
-  height: clamp(110px, 19vh, 200px);
+  height: var(--fader-h);
 }
 .pfl-mini {
   flex: 0 0 auto;
