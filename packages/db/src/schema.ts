@@ -129,7 +129,10 @@ export const REQUIRED_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;
  * equivalent). Idempotent.
  */
 export function migrate(db: SqliteDb): void {
-  db.pragma('journal_mode = WAL');
+  // node-sqlite3-wasm's WASM VFS doesn't truly support WAL (it silently falls back
+  // to rollback-journal anyway), so ask for what we actually get. WAL also adds
+  // -wal/-shm sidecars that complicate the lock story.
+  db.pragma('journal_mode = DELETE');
   db.pragma('foreign_keys = ON');
   const current = db.pragma('user_version', { simple: true }) as number;
   const pending = MIGRATIONS.filter((m) => m.version > current).sort((a, b) => a.version - b.version);

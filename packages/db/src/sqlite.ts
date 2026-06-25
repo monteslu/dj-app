@@ -22,7 +22,7 @@
 // runtime (verified against the real Node ESM loader). esbuild already injects a
 // createRequire in the ESM main bundle, so import.meta.url is valid here.
 import { createRequire } from 'node:module';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, rmSync, existsSync, statSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 const nodeRequire = createRequire(import.meta.url);
 const { Database: WasmDatabase } = nodeRequire('node-sqlite3-wasm') as typeof import('node-sqlite3-wasm');
@@ -107,6 +107,19 @@ export class SqliteDb {
         mkdirSync(dirname(dbPath), { recursive: true });
       } catch {
         /* dir already exists or path has no dir component */
+      }
+      // node-sqlite3-wasm locks via a `<db>.lock` DIRECTORY (mkdir mutex). If the
+      // app crashed while open, that dir is orphaned and every future open throws
+      // "database is locked". Electron is single-instance, so any lock present at
+      // construction is stale — remove it. (This was the real "unable to open
+      // database file" on restart-after-crash.)
+      const lockDir = `${dbPath}.lock`;
+      try {
+        if (existsSync(lockDir) && statSync(lockDir).isDirectory()) {
+          rmSync(lockDir, { recursive: true, force: true });
+        }
+      } catch {
+        /* best-effort */
       }
     }
     try {

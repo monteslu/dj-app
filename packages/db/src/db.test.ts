@@ -1,7 +1,29 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { mkdtempSync, mkdirSync, existsSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { LibraryDb } from './library-db.js';
+import { SqliteDb } from './sqlite.js';
 import { parseSearch } from './search.js';
 import { CueType } from './types.js';
+
+describe('SqliteDb stale-lock recovery', () => {
+  it('opens past an orphaned .lock directory left by a crashed run', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'djlock-'));
+    const dbPath = join(dir, 'library.db');
+    // simulate a crash: node-sqlite3-wasm's lock dir left behind
+    mkdirSync(`${dbPath}.lock`, { recursive: true });
+    expect(existsSync(`${dbPath}.lock`)).toBe(true);
+
+    // before the fix this threw "database is locked"; now it cleans + opens
+    const db = new SqliteDb(dbPath);
+    db.exec('CREATE TABLE t(id INTEGER)');
+    db.prepare('INSERT INTO t(id) VALUES (?)').run(7);
+    expect(db.prepare('SELECT id FROM t').get()).toEqual({ id: 7 });
+    db.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+});
 
 describe('parseSearch', () => {
   it('empty query matches all', () => {
