@@ -58,35 +58,20 @@ void main() {
   if (frame >= 0.0) {
     float tw = u_texSize.x;
     float th = u_texSize.y;
-    // Read the two adjacent buckets from the 2D-packed texture and blend them
-    // ourselves (NEAREST filtering; GPU LINEAR would bleed across row wraps).
-    float bF = frame / u_framesPerBucket;     // fractional bucket index
-    float b0 = floor(bF);
-    float b1 = b0 + 1.0;
-    float f = bF - b0;                        // 0..1 blend between the two buckets
-    vec4 t0 = vec4(0.0);
-    vec4 t1 = vec4(0.0);
-    if (b0 >= 0.0 && b0 < u_texLen) {
-      t0 = texture2D(u_tex, vec2((mod(b0, tw) + 0.5) / tw, (floor(b0 / tw) + 0.5) / th));
-    }
-    if (b1 >= 0.0 && b1 < u_texLen) {
-      t1 = texture2D(u_tex, vec2((mod(b1, tw) + 0.5) / tw, (floor(b1 / tw) + 0.5) / th));
-    }
-    // LINEAR blend between adjacent buckets → the bar height changes SMOOTHLY as
-    // the playhead scrolls sub-bucket, instead of snapping (which looked like the
-    // wave "changing shape" every frame). The peaks are static (uploaded once); we
-    // only smooth the read.
-    vec4 t = mix(t0, t1, f);
-    float barH = t.a * mid * 0.92;
-    // Anti-aliased bar edge: a hard abs(y-mid) <= barH makes the top edge snap to
-    // the nearest pixel row, so as barH changes sub-pixel while scrolling the edge
-    // flickers up/down by a pixel (the resizing/shimmer weirdness). smoothstep
-    // over a 1px band feathers the edge → stable, clean motion.
-    float edge = 1.0 - smoothstep(barH - 1.0, barH + 1.0, abs(y - mid));
-    if (edge > 0.0) {
-      vec3 bar = bandColor(t.rgb);
-      if (x < centerX) bar *= 0.5;                          // played = dimmed
-      col = mix(col, bar, edge);
+    // ONE bucket per pixel. A source bucket has ONE height, always — bucket → bar
+    // height is deterministic, so horizontal scrolling can NEVER change a bar's
+    // height (it only changes which buckets are visible). No blend, no smoothing:
+    // those made the bucket-mix ratio depend on sub-pixel position, which IS what
+    // distorted the heights. (Peaks are static, uploaded once on load.)
+    float b = floor(frame / u_framesPerBucket);
+    if (b >= 0.0 && b < u_texLen) {
+      vec4 t = texture2D(u_tex, vec2((mod(b, tw) + 0.5) / tw, (floor(b / tw) + 0.5) / th));
+      float barH = t.a * mid * 0.92;
+      if (abs(y - mid) <= barH) {
+        vec3 bar = bandColor(t.rgb);
+        if (x < centerX) bar *= 0.5;                        // played = dimmed
+        col = bar;
+      }
     }
   }
 

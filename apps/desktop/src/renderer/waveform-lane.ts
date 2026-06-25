@@ -32,13 +32,6 @@ export class WaveformLaneController {
   private ro: ResizeObserver;
   private readonly group: string;
 
-  // Position smoothing (dead-reckoning). The worklet publishes playPosition only
-  // every ~10.7ms, not every frame, so reading it raw makes the scroll jump-then-
-  // hold ("quantized"). We extrapolate between updates: anchor on each NEW
-  // published frame, then advance by rate*elapsed each render → flowing motion.
-  private anchorFrames = -1; // last published position (source frames)
-  private anchorTime = 0; // performance.now() when we anchored
-  private lastPublished = -1; // raw published fraction we last saw, to detect change
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -78,8 +71,6 @@ export class WaveformLaneController {
       const frames = this.bus.get(g, DeckKeys.trackSamples);
       const fraction = this.bus.get(g, DeckKeys.playPosition);
       const fileBpm = this.bus.get(g, DeckKeys.fileBpm);
-      const playing = this.bus.get(g, DeckKeys.play) > 0.5;
-      const rateRatio = this.bus.get(g, DeckKeys.rateRatio) || 1;
       // Use the REAL sample rate (positions + firstBeatFrame are in decoded frames
       // at the AudioContext rate); a hardcoded 48000 drifts the grid when the
       // context runs at 44100, so synced grids wouldn't line up.
@@ -93,32 +84,12 @@ export class WaveformLaneController {
       const zoomIdx = this.bus.get(MASTER, MasterKeys.waveformZoom);
       const framesPerPx = framesPerPxForZoom(zoomIdx >= 0 ? zoomIdx : DEFAULT_ZOOM_INDEX);
 
-      // Smooth, MONOTONIC position. The worklet publishes playPosition only every
-      // ~10.7ms, so reading it raw makes the scroll jump-then-hold ("quantized").
-      // We extrapolate forward by rate*elapsed between publishes — but the position
-      // must only ever MOVE FORWARD at a steady rate while playing; any backward or
-      // jittery correction makes each pixel re-sample a different bucket and the
-      // amplitudes shimmer. So: take the MAX of (last estimate continued) and the
-      // newly published value, never snapping backward. Seeks/pause snap exactly.
-      const publishedFrames = fraction * frames;
-      const now = performance.now();
-      const continued =
-        this.anchorFrames < 0
-          ? publishedFrames
-          : this.anchorFrames + ((now - this.anchorTime) / 1000) * rateRatio * sr;
-
-      let positionFrames: number;
-      if (!playing || this.anchorFrames < 0 || Math.abs(publishedFrames - continued) > sr * 0.5) {
-        // paused, first frame, or a seek/jump → snap exactly to truth
-        positionFrames = publishedFrames;
-      } else {
-        // playing: never go backward; let the published value pull us forward when
-        // it's ahead, otherwise keep gliding at the steady rate.
-        positionFrames = Math.max(continued, publishedFrames);
-      }
-      this.anchorFrames = positionFrames;
-      this.anchorTime = now;
-      this.lastPublished = fraction;
+      // The position to render from: just the playhead, in source frames. The
+      // worklet publishes it ~every 10.7ms; we render whatever it currently is.
+      // Deterministic: this scalar fully determines the visible window, and the
+      // shader maps each pixel to one static bucket, so the same content always has
+      // the same height. (No extrapolation/smoothing — that caused the morph.)
+      const positionFrames = fraction * frames;
 
       const params = {
         positionFrames,
