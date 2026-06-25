@@ -17,6 +17,8 @@ interface Props {
   /** Value the knob resets to on double-click. */
   center: number;
   big?: boolean;
+  /** Tooltip describing what the knob does (shown with the live value). */
+  hint?: string;
 }
 
 const SWEEP = 270; // degrees of total travel
@@ -28,7 +30,7 @@ function polar(cx: number, cy: number, r: number, deg: number): [number, number]
   return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)];
 }
 
-export function Knob({ group, ckey, label, min, max, center, big }: Props): React.JSX.Element {
+export function Knob({ group, ckey, label, min, max, center, big, hint }: Props): React.JSX.Element {
   const [value, setValue] = useControl(group, ckey);
   const dragState = useRef<{ y: number; v: number } | null>(null);
 
@@ -71,7 +73,10 @@ export function Knob({ group, ckey, label, min, max, center, big }: Props): Reac
   }, []);
 
   return (
-    <div className={`knob ${big ? 'knob-big' : ''}`} title={`${label}: ${value.toFixed(2)}`}>
+    <div
+      className={`knob ${big ? 'knob-big' : ''}`}
+      title={`${hint ? hint + ' — ' : ''}${label}: ${value.toFixed(2)} (drag to adjust, double-click to reset)`}
+    >
       <svg
         viewBox="0 0 48 48"
         width={size}

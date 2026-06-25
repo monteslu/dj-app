@@ -44,12 +44,39 @@ body,
 }
 
 .app {
+  /* --console-h is set by the Splitter drag; defaults to a flexible share. */
+  --console-h: minmax(220px, 1fr);
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) minmax(0, 1.1fr) auto;
-  grid-template-areas: 'top' 'waveband' 'console' 'library' 'status';
+  grid-template-rows: auto auto var(--console-h) auto minmax(120px, 1fr) auto;
+  grid-template-areas: 'top' 'waveband' 'console' 'split' 'library' 'status';
   height: 100%;
   background:
     radial-gradient(1400px 600px at 50% -10%, #141a26 0%, transparent 70%), var(--bg);
+}
+
+/* drag handle between the decks and the library */
+.splitter {
+  grid-area: split;
+  height: 9px;
+  cursor: row-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-2);
+  border-top: 1px solid var(--edge);
+  border-bottom: 1px solid var(--edge);
+}
+.splitter:hover {
+  background: var(--panel-2);
+}
+.splitter-grip {
+  width: 46px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--text-faint);
+}
+.splitter:hover .splitter-grip {
+  background: var(--accent);
 }
 
 /* ── titlebar ─────────────────────────────────────────────── */
@@ -176,13 +203,15 @@ body,
   display: block;
   border-radius: 4px;
 }
-.wf-overview {
+/* full-track minimap next to the platter */
+.overview-strip {
   width: 100%;
-  height: 22px;
+  height: 30px;
   display: block;
-  border-radius: 3px;
+  border-radius: 4px;
   cursor: pointer;
-  opacity: 0.85;
+  background: #0b0e14;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
 }
 
 /* ── deck ─────────────────────────────────────────────────── */
@@ -196,9 +225,16 @@ body,
   gap: 9px;
   min-width: 0;
   min-height: 0;
-  overflow: hidden;
+  /* scroll the deck's own controls when the console is short, instead of
+     clipping them out of reach (the bug: controls vanished at low height). */
+  overflow-y: auto;
+  overflow-x: hidden;
   box-shadow: var(--shadow), var(--shadow-inset);
   position: relative;
+}
+.deck.drag-over {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-glow), var(--shadow);
 }
 .deck::before {
   content: '';

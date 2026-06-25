@@ -27,7 +27,7 @@ import {
   type Key,
   type RegisteredControl,
 } from './types.js';
-import { allocateSab, sabWrite, type SabLayout } from './sab.js';
+import { allocateSab, sabWrite, sabRead, sabGeneration, type SabLayout } from './sab.js';
 
 export interface ControlBusOptions {
   /**
@@ -52,6 +52,9 @@ export class ControlBus {
 
   /** SAB mirror, if enabled. Exposed so the host can ship the buffer to the worklet. */
   readonly sab?: SabLayout;
+
+  /** Last SAB generation seen by syncFromSab (skip readback when unchanged). */
+  private lastSabGeneration = -1;
 
   constructor(options: ControlBusOptions = {}) {
     this.persisted = options.persistedValues ?? {};
@@ -178,6 +181,38 @@ export class ControlBus {
   reset(group: Group, key: Key): void {
     const reg = this.require(controlId(group, key));
     this.setById(reg.id, reg.default);
+  }
+
+  /**
+   * Pull worklet-written values from the SAB back into the JS values (and notify
+   * subscribers of any that changed). The AudioWorklet writes things like play
+   * position, effective rate, and VU levels into the SAB; without this readback
+   * the renderer's `get()` would only ever see values the renderer itself set, so
+   * the position/waveform/meters would never advance. Call this on a render loop
+   * (rAF). Returns the number of controls that changed.
+   *
+   * Uses the SAB generation counter to skip work when nothing changed since the
+   * last call.
+   */
+  syncFromSab(): number {
+    if (!this.sab) {
+      return 0;
+    }
+    const gen = sabGeneration(this.sab);
+    if (gen === this.lastSabGeneration) {
+      return 0;
+    }
+    this.lastSabGeneration = gen;
+    let changed = 0;
+    for (const reg of this.byId.values()) {
+      const v = sabRead(this.sab, reg.index);
+      if (this.values[reg.index] !== v) {
+        this.values[reg.index] = v;
+        this.emit(reg.id, v);
+        changed++;
+      }
+    }
+    return changed;
   }
 
   /**

@@ -3,7 +3,7 @@ import { ControlBus } from './bus.js';
 import { controlId, parseControlId } from './types.js';
 import { deck, DeckKeys, MASTER, MasterKeys } from './keys.js';
 import { standardControls } from './standard-controls.js';
-import { wrapSab, sabRead } from './sab.js';
+import { wrapSab, sabRead, sabWrite } from './sab.js';
 
 describe('ControlId', () => {
   it('round-trips group/key, splitting on the first comma', () => {
@@ -128,6 +128,29 @@ describe('ControlBus SAB mirror', () => {
     const bus = new ControlBus({ sab: { capacity: 1 } });
     bus.define({ group: '[A]', key: 'x', default: 0 });
     expect(() => bus.define({ group: '[A]', key: 'y', default: 0 })).toThrow(/capacity/);
+  });
+
+  // Regression: the worklet writes play position etc. into the SAB; the renderer
+  // must read it back via syncFromSab or the UI never updates (waveform frozen,
+  // BPM/position stuck) even though audio is advancing.
+  it('syncFromSab pulls worklet-written values back into the bus + notifies', () => {
+    const bus = new ControlBus({ sab: { capacity: 64 } });
+    const reg = bus.define({ group: '[Channel1]', key: 'playposition', default: 0 });
+    const seen: number[] = [];
+    bus.connect('[Channel1]', 'playposition', (v) => seen.push(v));
+
+    // simulate the worklet advancing position in the shared buffer
+    const worklet = wrapSab(bus.sab!.buffer, bus.sab!.capacity);
+    sabWrite(worklet, reg.index, 0.5);
+
+    expect(bus.get('[Channel1]', 'playposition')).toBe(0); // not read back yet
+    const changed = bus.syncFromSab();
+    expect(changed).toBe(1);
+    expect(bus.get('[Channel1]', 'playposition')).toBe(0.5); // now reflects the worklet
+    expect(seen).toContain(0.5); // subscribers were notified
+
+    // unchanged SAB → no work (generation guard)
+    expect(bus.syncFromSab()).toBe(0);
   });
 });
 

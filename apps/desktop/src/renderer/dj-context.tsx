@@ -77,6 +77,21 @@ export function DjProvider({ children }: { children: ReactNode }): React.JSX.Ele
     setStarted(true);
   }, [runtime, started]);
 
+  // SAB readback pump: the AudioWorklet writes play position, effective rate, and
+  // VU levels into the shared buffer; this loop pulls them back into the bus each
+  // frame so the UI (waveform position, BPM, meters) actually updates. Without it
+  // get() only ever returns values the renderer itself set, so playback looks
+  // frozen even when audio is running. The generation check makes it cheap.
+  useEffect(() => {
+    let raf = 0;
+    const pump = () => {
+      runtime.bus.syncFromSab();
+      raf = requestAnimationFrame(pump);
+    };
+    raf = requestAnimationFrame(pump);
+    return () => cancelAnimationFrame(raf);
+  }, [runtime]);
+
   useEffect(() => {
     return () => {
       runtime.recording.dispose();

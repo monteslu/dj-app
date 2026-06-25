@@ -187,7 +187,7 @@ ipcMain.handle('library:readTrackById', async (_e, id: number) => {
   }
   const buf = await readFile(track.location);
   const arrayBuffer = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
-  return { name: track.filename, data: arrayBuffer };
+  return { name: track.filename, data: arrayBuffer, path: track.location };
 });
 
 // IPC: pick a folder + scan it, streaming progress back to the renderer.

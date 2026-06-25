@@ -102,6 +102,15 @@ export function Library(): React.JSX.Element {
     }
   }, [refresh]);
 
+  // Double-click target: first STOPPED deck (Mixxx behavior), else deck 1. Avoids
+  // clobbering a deck that's currently playing out.
+  const firstStoppedDeck = useCallback((): number => {
+    for (let d = 0; d < NUM_DECKS; d++) {
+      if (bus.get(deckGroup(d + 1), DeckKeys.play) < 0.5) return d;
+    }
+    return 0;
+  }, [bus]);
+
   const loadToDeck = useCallback(
     async (track: LibTrack, deckIndex: number) => {
       if (!started) {
@@ -219,8 +228,14 @@ export function Library(): React.JSX.Element {
               <tr
                 key={t.id}
                 className={selected === t.id ? 'selected' : ''}
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('application/x-dj-track-id', String(t.id));
+                  e.dataTransfer.effectAllowed = 'copy';
+                }}
                 onClick={() => setSelected(t.id)}
-                onDoubleClick={() => void loadToDeck(t, 0)}
+                onDoubleClick={() => void loadToDeck(t, firstStoppedDeck())}
+                title="Double-click → first stopped deck · drag onto a deck · or use the deck buttons →"
               >
                 <td>{t.artist}</td>
                 <td>{t.title}</td>

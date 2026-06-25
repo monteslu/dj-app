@@ -18,6 +18,7 @@ import { HotcueRow } from './HotcueRow.js';
 import { LoopRow } from './LoopRow.js';
 import { QuickEffect } from './QuickEffect.js';
 import { Platter } from './Platter.js';
+import { OverviewStrip } from './OverviewStrip.js';
 import { setDeckTrack, useDeckTrack } from '../deck-state.js';
 
 interface Props {
@@ -39,6 +40,7 @@ export function Deck({ deckIndex, side = 'left' }: Props): React.JSX.Element {
   const rateRatio = useControlValue(grp, DeckKeys.rateRatio);
 
   const [loading, setLoading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const deckTrack = useDeckTrack(deckIndex);
   const trackName = deckTrack.artist
     ? `${deckTrack.artist} - ${deckTrack.title ?? ''}`
@@ -139,11 +141,24 @@ export function Deck({ deckIndex, side = 'left' }: Props): React.JSX.Element {
   const onDrop = useCallback(
     async (e: React.DragEvent) => {
       e.preventDefault();
+      setDragOver(false);
+
+      // 1. Drag from the library (a track id) → load that track to THIS deck.
+      const libId = e.dataTransfer.getData('application/x-dj-track-id');
+      if (libId) {
+        const file = await window.dj.readTrackById(Number(libId));
+        if (file) {
+          await loadFile(file);
+          void fetchCover(file.path);
+        }
+        return;
+      }
+
+      // 2. Drag a file from the OS.
       const f = e.dataTransfer.files[0] as (File & { path?: string }) | undefined;
       if (!f) {
         return;
       }
-      // Electron exposes the absolute path on dropped files.
       if (f.path) {
         const file = await window.dj.readTrack(f.path);
         await loadFile(file);
@@ -190,8 +205,15 @@ export function Deck({ deckIndex, side = 'left' }: Props): React.JSX.Element {
 
   return (
     <section
-      className={`deck ${side}`}
-      onDragOver={(e) => e.preventDefault()}
+      className={`deck ${side} ${dragOver ? 'drag-over' : ''}`}
+      onDragOver={(e) => {
+        e.preventDefault();
+        if (!dragOver) setDragOver(true);
+      }}
+      onDragLeave={(e) => {
+        // only clear when leaving the deck entirely, not crossing children
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver(false);
+      }}
       onDrop={onDrop}
       aria-label={`Deck ${deckIndex + 1}`}
     >
@@ -225,6 +247,8 @@ export function Deck({ deckIndex, side = 'left' }: Props): React.JSX.Element {
           </div>
         </div>
       </div>
+
+      <OverviewStrip deckIndex={deckIndex} />
 
       <div className="deck-transport">
         <button className="cue-btn" onClick={cue} disabled={!trackLoaded}>
@@ -277,9 +301,9 @@ export function Deck({ deckIndex, side = 'left' }: Props): React.JSX.Element {
       <LoopRow deckIndex={deckIndex} />
 
       <div className="deck-eq">
-        <Knob group={grp} ckey={DeckKeys.eqHigh} label="HI" min={0} max={4} center={1} />
-        <Knob group={grp} ckey={DeckKeys.eqMid} label="MID" min={0} max={4} center={1} />
-        <Knob group={grp} ckey={DeckKeys.eqLow} label="LOW" min={0} max={4} center={1} />
+        <Knob group={grp} ckey={DeckKeys.eqHigh} label="HI" min={0} max={4} center={1} hint="High EQ (treble)" />
+        <Knob group={grp} ckey={DeckKeys.eqMid} label="MID" min={0} max={4} center={1} hint="Mid EQ" />
+        <Knob group={grp} ckey={DeckKeys.eqLow} label="LOW" min={0} max={4} center={1} hint="Low EQ (bass)" />
         <QuickEffect deckIndex={deckIndex} />
       </div>
     </section>

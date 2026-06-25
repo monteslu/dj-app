@@ -30,6 +30,7 @@ export function TempoFader({
         value={-rate}
         onChange={(e) => setRate(-Number(e.target.value))}
         onDoubleClick={() => setRate(0)}
+        title={`Tempo / pitch fader (deck ${deckIndex + 1}). Drag up = faster, down = slower. Double-click to reset to 0%.`}
       />
       <span className="fader-val">
         {rate >= 0 ? '+' : ''}
@@ -53,6 +54,7 @@ export function GainFader({ deckIndex }: { deckIndex: number }): React.JSX.Eleme
         step={0.005}
         value={vol}
         onChange={(e) => setVol(Number(e.target.value))}
+        title={`Channel ${deckIndex + 1} volume fader`}
       />
     </div>
   );
