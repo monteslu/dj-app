@@ -45,7 +45,7 @@ function goertzel(samples: Float32Array, start: number, len: number, freq: numbe
   const w = (2 * Math.PI * k) / len;
   const cosw = Math.cos(w);
   const coeff = 2 * cosw;
-  let s0 = 0;
+  let s0: number; // assigned each iteration before use
   let s1 = 0;
   let s2 = 0;
   const end = Math.min(start + len, samples.length);

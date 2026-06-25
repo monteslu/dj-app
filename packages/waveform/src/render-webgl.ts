@@ -131,7 +131,7 @@ export class WaveformGL {
     // NEVER throw from here: any WebGL failure (no context, shader compile, link)
     // must degrade to ok=false so the caller falls back to Canvas2D. A throw would
     // crash the React tree that constructs this.
-    let gl: WebGLRenderingContext | null = null;
+    let gl: WebGLRenderingContext | null;
     try {
       // Match the context attrs that butterchurn (WebGL, proven working on this
       // same AMD+Wayland machine) uses. The key one is alpha:FALSE — an

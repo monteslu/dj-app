@@ -5,6 +5,14 @@ import { base64ToBytes } from './base64.js';
 // no atob and no Buffer). A bug here = the audio engine never loads = no playback.
 // So: verify it against Node's own base64 decode across many inputs.
 
+// Node's Buffer is the test ORACLE (the shipping code is globals-free; this only
+// runs under vitest/Node). Declared locally so the package's tsconfig stays free
+// of @types/node — @types/node 26 no longer leaks Buffer as an ambient global.
+declare const Buffer: {
+  from(s: string, enc: string): Uint8Array;
+  from(a: Uint8Array): { toString(enc: string): string };
+};
+
 function ref(b64: string): Uint8Array {
   return new Uint8Array(Buffer.from(b64, 'base64'));
 }

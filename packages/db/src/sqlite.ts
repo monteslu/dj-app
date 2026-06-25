@@ -150,7 +150,7 @@ export class SqliteDb {
           /* fall through to the thrown error below */
         }
       }
-      throw new Error(`SqliteDb: failed to open database at "${dbPath}": ${String(e)}`);
+      throw new Error(`SqliteDb: failed to open database at "${dbPath}": ${String(e)}`, { cause: e });
     }
   }
 
