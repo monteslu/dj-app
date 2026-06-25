@@ -4,13 +4,14 @@
  * via the deck buttons). Scan adds a folder.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import type { LibTrack } from '../../shared/ipc.js';
 import { useDj, NUM_DECKS } from '../dj-context.js';
 import { decodeArrayBuffer } from '@internal-dj/codec';
 import { computePeakSet, detailBucketsForDuration } from '@internal-dj/waveform';
 import { deck as deckGroup, DeckKeys } from '@internal-dj/control-bus';
 import { setDeckTrack } from '../deck-state.js';
+import { RowWaveform } from './RowWaveform.js';
 
 type SortCol = 'artist' | 'title' | 'album' | 'bpm' | 'duration' | 'genre';
 
@@ -50,7 +51,11 @@ const DEMO_TRACKS: LibTrack[] = (
 }));
 
 export function Library(): React.JSX.Element {
-  const { engine, bus, analysis, started, start } = useDj();
+  const { engine, bus, analysis, analysisQueue, started, start } = useDj();
+  const analysisStatus = useSyncExternalStore(
+    (cb) => analysisQueue.subscribe(cb),
+    () => analysisQueue.getStatus(),
+  );
   const [tracks, setTracks] = useState<LibTrack[]>([]);
   const [search, setSearch] = useState('');
   const [sortCol, setSortCol] = useState<SortCol>('artist');
@@ -99,8 +104,10 @@ export function Library(): React.JSX.Element {
     setScanning(null);
     if (summary) {
       await refresh();
+      // newly-added songs are unanalyzed → background-analyze them
+      void analysisQueue.enqueueUnanalyzed();
     }
-  }, [refresh]);
+  }, [refresh, analysisQueue]);
 
   // Double-click target: first STOPPED deck (Mixxx behavior), else deck 1. Avoids
   // clobbering a deck that's currently playing out.
@@ -207,6 +214,11 @@ export function Library(): React.JSX.Element {
           {scanning ? scanning : '+ add folder'}
         </button>
         <span className="library-count">{tracks.length} tracks</span>
+        {analysisStatus.remaining > 0 && (
+          <span className="library-analyzing" title="Analyzing tracks in the background">
+            <span className="spin" /> analyzing {analysisStatus.remaining} left
+          </span>
+        )}
         {dbError && <span className="library-error">{dbError}</span>}
       </div>
 
@@ -214,6 +226,7 @@ export function Library(): React.JSX.Element {
         <table className="library-table">
           <thead>
             <tr>
+              <th className="th-wave">WAVE</th>
               {(['artist', 'title', 'album', 'genre', 'bpm'] as SortCol[]).map((c) => (
                 <th key={c} onClick={() => toggleSort(c)} className={sortCol === c ? 'sorted' : ''}>
                   {c.toUpperCase()}
@@ -244,6 +257,13 @@ export function Library(): React.JSX.Element {
                 onDoubleClick={() => void loadToDeck(t, firstStoppedDeck())}
                 title="Double-click → first stopped deck · drag onto a deck · or use the deck buttons →"
               >
+                <td className="td-wave">
+                  <RowWaveform
+                    trackId={t.id}
+                    analyzing={analysisStatus.current === t.id}
+                    done={analysisStatus.done.has(t.id)}
+                  />
+                </td>
                 <td>{t.artist}</td>
                 <td>{t.title}</td>
                 <td>{t.album}</td>

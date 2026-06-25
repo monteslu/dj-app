@@ -981,6 +981,55 @@ body,
   font-size: 11px;
   color: var(--danger);
 }
+.library-analyzing {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--accent);
+}
+
+/* tiny spinner (background analysis indicator) */
+.spin {
+  width: 11px;
+  height: 11px;
+  border: 2px solid var(--edge-bright);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  display: inline-block;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* per-row mini waveform (rekordbox/VirtualDJ style); pre-rendered to an image */
+.th-wave {
+  width: 128px;
+}
+.td-wave {
+  padding: 2px 6px !important;
+  width: 128px;
+}
+.rowwave {
+  display: inline-block;
+  width: 120px;
+  height: 26px;
+  border-radius: 3px;
+  vertical-align: middle;
+}
+.rowwave-empty {
+  background: repeating-linear-gradient(90deg, #11151c 0 2px, #0c0f14 2px 4px);
+  opacity: 0.5;
+}
+.rowwave-analyzing {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #0c0f14;
+}
 .library-table-wrap {
   flex: 1;
   overflow: auto;

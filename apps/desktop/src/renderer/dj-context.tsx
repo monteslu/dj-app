@@ -19,6 +19,7 @@ import {
 import { ControlBus, standardControls, type Group, type Key } from '@internal-dj/control-bus';
 import { Engine } from '@internal-dj/audio-engine';
 import { AnalysisService } from './analysis-service.js';
+import { AnalysisQueue } from './analysis-queue.js';
 import { ControllerService } from './controller-service.js';
 import { RecordingService } from './recording-service.js';
 
@@ -31,6 +32,7 @@ export interface DjRuntime {
   bus: ControlBus;
   engine: Engine;
   analysis: AnalysisService;
+  analysisQueue: AnalysisQueue;
   controllers: ControllerService;
   recording: RecordingService;
   /** True once the AudioContext has been started (needs a user gesture). */
@@ -44,6 +46,7 @@ function buildRuntime(): {
   bus: ControlBus;
   engine: Engine;
   analysis: AnalysisService;
+  analysisQueue: AnalysisQueue;
   controllers: ControllerService;
   recording: RecordingService;
 } {
@@ -60,9 +63,10 @@ function buildRuntime(): {
 
   const engine = new Engine({ bus, numDecks: NUM_DECKS, workletUrl });
   const analysis = new AnalysisService();
+  const analysisQueue = new AnalysisQueue(engine, analysis);
   const controllers = new ControllerService(bus);
   const recording = new RecordingService(engine);
-  return { bus, engine, analysis, controllers, recording };
+  return { bus, engine, analysis, analysisQueue, controllers, recording };
 }
 
 export function DjProvider({ children }: { children: ReactNode }): React.JSX.Element {
@@ -75,6 +79,9 @@ export function DjProvider({ children }: { children: ReactNode }): React.JSX.Ele
     }
     await runtime.engine.start();
     setStarted(true);
+    // Once the AudioContext exists we can decode, so kick off background analysis
+    // of any songs the library hasn't processed yet (app-load catch-up).
+    void runtime.analysisQueue.enqueueUnanalyzed();
   }, [runtime, started]);
 
   // SAB readback pump: the AudioWorklet writes play position, effective rate, and
@@ -97,6 +104,7 @@ export function DjProvider({ children }: { children: ReactNode }): React.JSX.Ele
       runtime.recording.dispose();
       void runtime.engine.dispose();
       runtime.analysis.dispose();
+      runtime.analysisQueue.dispose();
       runtime.controllers.dispose();
     };
   }, [runtime]);
@@ -107,6 +115,7 @@ export function DjProvider({ children }: { children: ReactNode }): React.JSX.Ele
         bus: runtime.bus,
         engine: runtime.engine,
         analysis: runtime.analysis,
+        analysisQueue: runtime.analysisQueue,
         controllers: runtime.controllers,
         recording: runtime.recording,
         started,
