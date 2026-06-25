@@ -65,7 +65,13 @@ export class WasmResampler {
   constructor() {
     const bytes = base64ToBytes(resamplerWasmBase64);
     const module = new WebAssembly.Module(bytes);
-    const instance = new WebAssembly.Instance(module, {});
+    const instance = new WebAssembly.Instance(module, {
+      env: {
+        // Required by ALLOW_MEMORY_GROWTH (a full track's stereo source can grow
+        // the heap past 32MB). We re-read heap views per call, so a no-op is fine.
+        emscripten_notify_memory_growth: () => {},
+      },
+    });
     this.ex = instance.exports as unknown as ResamplerExports;
     this.ex._initialize?.();
   }

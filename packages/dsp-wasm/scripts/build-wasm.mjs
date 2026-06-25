@@ -24,6 +24,10 @@ const modules = [
     name: 'resampler',
     src: 'resampler.c',
     exports: ['_resampler_pull', '_resampler_last_position', '_resampler_last_produced', '_malloc', '_free'],
+    // The resampler holds the WHOLE track's stereo float source — a 3-min song is
+    // ~66MB, well past the 32MB default. Without growth malloc returns 0 and the
+    // heap.set() crashes with "offset is out of bounds" on load. Allow growth.
+    growMemory: true,
   },
   {
     name: 'beatdetect',
