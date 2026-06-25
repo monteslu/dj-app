@@ -250,32 +250,42 @@ export function drawScrolling(
     }
   }
 
-  // waveform columns, colored by amplitude, dimmed when played. ONE pass builds a
-  // Path2D per palette bucket (×2 for played/live), then each bucket is filled in
-  // a single fill() call — so fillStyle changes drop from ~1000/frame to ~96, and
-  // there are zero per-pixel string allocations. This is what fixes choppy
-  // playback.
-  const paths: Path2D[] = [];
-  for (let i = 0; i < PALETTE_N * 2; i++) paths.push(new Path2D());
-  for (let x = 0; x < w; x++) {
-    const frame = positionFrames + (x - centerX) * framesPerPx;
-    if (frame < 0) continue;
-    const b = Math.floor(frame / framesPerBucket);
-    if (b >= length) break;
-    const v = peaks[b]!;
-    const amp = (v / 255) * mid * 0.92;
-    const bucket = ((v / 255) * (PALETTE_N - 1)) | 0;
-    const played = x < centerX ? 1 : 0;
-    paths[bucket * 2 + played]!.rect(x, mid - amp, 1, amp * 2);
-  }
-  for (let p = 0; p < PALETTE_N; p++) {
-    ctx.fillStyle = PALETTE_LIVE[p]!;
-    ctx.fill(paths[p * 2]!);
-    ctx.fillStyle = PALETTE_PLAYED[p]!;
-    ctx.fill(paths[p * 2 + 1]!);
-  }
+  // Waveform bars — DETERMINISTIC, no height morph. Two-part scroll:
+  //  1. SNAP the sampling origin to the pixel grid: each integer column maps to a
+  //     fixed source-bucket range, so a bucket's bar height NEVER changes as we
+  //     scroll (horizontal movement can't cause vertical change). This is the same
+  //     rule Mixxx uses (round(pos/fpp)*fpp).
+  //  2. Translate the whole draw by the sub-pixel REMAINDER so the snapped bars
+  //     slide smoothly instead of stepping a whole pixel at a time. A pure
+  //     ctx translate can't touch heights — the bars are already shaped.
+  const posPx = positionFrames / framesPerPx;
+  const snapPx = Math.round(posPx);
+  const subPx = posPx - snapPx; // -0.5..0.5
+  const bands = detail.low && detail.mid && detail.high;
 
-  // center playhead — glowing line
+  ctx.save();
+  ctx.translate(-subPx, 0); // smooth sub-pixel slide of the snapped bars
+  // draw one extra column each side so the translate never reveals a gap
+  for (let x = -1; x <= w; x++) {
+    const b = snapPx + (x - centerX); // integer bucket-column (snapped → frozen)
+    const frame = b * framesPerPx;
+    if (frame < 0) continue;
+    const bi = Math.floor(frame / framesPerBucket);
+    if (bi >= length) break;
+    const v = peaks[bi]!;
+    const amp = (v / 255) * mid * 0.92;
+    if (amp <= 0) continue;
+    if (bands) {
+      ctx.fillStyle = bandColorCss(detail.low![bi]!, detail.mid![bi]!, detail.high![bi]!, x < centerX);
+    } else {
+      const bucket = ((v / 255) * (PALETTE_N - 1)) | 0;
+      ctx.fillStyle = x < centerX ? PALETTE_PLAYED[bucket]! : PALETTE_LIVE[bucket]!;
+    }
+    ctx.fillRect(x, mid - amp, 1, amp * 2);
+  }
+  ctx.restore();
+
+  // center playhead — glowing line (drawn AFTER restore so it stays fixed/sharp)
   ctx.fillStyle = 'rgba(255,90,90,0.18)';
   ctx.fillRect(centerX - 2, 0, 4, h);
   ctx.fillStyle = '#ff5a5a';
