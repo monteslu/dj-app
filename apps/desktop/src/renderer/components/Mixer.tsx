@@ -17,19 +17,12 @@ import { QuickEffect } from './QuickEffect.js';
 function ChannelStrip({ deckIndex }: { deckIndex: number }): React.JSX.Element {
   const g = deckGroup(deckIndex + 1);
   const [vol, setVol] = useControl(g, DeckKeys.volume);
-  const [pfl, setPfl] = useControl(g, DeckKeys.pfl);
   const accent = deckIndex === 0 ? 'a' : 'b';
 
   return (
     <div className={`chan chan-${accent}`}>
-      <button
-        className={`pfl-mini ${pfl > 0.5 ? 'active' : ''}`}
-        onClick={() => setPfl(pfl > 0.5 ? 0 : 1)}
-        title="Headphone cue (PFL) — monitor this deck in the headphones"
-      >
-        🎧
-      </button>
-      {/* EQ knob column + the channel fader beside it (Mixxx layout) */}
+      {/* PFL (headphone cue) lives on each DECK's transport row, not here — having
+          it in both was a duplicate of the same control. EQ knobs + channel fader: */}
       <div className="chan-body">
         <div className="chan-knobs">
           <Knob group={g} ckey={DeckKeys.pregain} label="GAIN" min={0} max={4} center={1} hint="Gain / trim" />
@@ -94,7 +87,7 @@ export function Mixer(): React.JSX.Element {
 
       <div className="mixer-bottom">
         <div className="mixer-xfader">
-          <span className="xfader-end a">A</span>
+          <span className="xfader-end a">1</span>
           <input
             type="range"
             min={-1}
@@ -104,9 +97,9 @@ export function Mixer(): React.JSX.Element {
             onChange={(e) => setXfader(Number(e.target.value))}
             className="xfader-slider"
             onDoubleClick={() => setXfader(0)}
-            title="Crossfader — blends deck 1 (A) and deck 2 (B). Double-click to center."
+            title="Crossfader — blends deck 1 and deck 2. Double-click to center."
           />
-          <span className="xfader-end b">B</span>
+          <span className="xfader-end b">2</span>
         </div>
       </div>
     </section>

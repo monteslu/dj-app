@@ -966,17 +966,6 @@ body,
 .mixer-vus .vu-meter {
   height: 100%;
 }
-.pfl-mini {
-  flex: 0 0 auto;
-  font-size: 12px;
-  padding: 3px 6px;
-  line-height: 1;
-}
-.pfl-mini.active {
-  background: var(--accent-2);
-  border-color: var(--accent);
-  box-shadow: 0 0 8px var(--accent-glow);
-}
 
 .mixer-bottom {
   flex: 0 0 auto;
