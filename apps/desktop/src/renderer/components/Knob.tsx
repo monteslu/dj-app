@@ -120,7 +120,7 @@ export function Knob({ group, ckey, label, min, max, center, big, hint }: Props)
         <path d={arc} className="knob-arc" fill="none" />
         <line x1={C} y1={C} x2={ix} y2={iy} className="knob-indicator" />
       </svg>
-      <span className="knob-label">{label}</span>
+      {label && <span className="knob-label">{label}</span>}
     </div>
   );
 }

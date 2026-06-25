@@ -24,7 +24,8 @@ export function MainControls(): React.JSX.Element {
       >
         🧠
       </button>
-      <Knob group={MASTER} ckey={MasterKeys.gain} label="MAIN" min={0} max={5} center={1} hint="Master output level" />
+      <span className="main-label">MAIN</span>
+      <Knob group={MASTER} ckey={MasterKeys.gain} label="" min={0} max={5} center={1} hint="Master output level" />
     </div>
   );
 }
