@@ -100,6 +100,10 @@ function handleAppProtocol(request: Request): Promise<Response> {
       for (const [k, v] of Object.entries(ISOLATION_HEADERS)) {
         headers.set(k, v);
       }
+      // Never let Electron's HTTP cache serve a stale renderer after a rebuild —
+      // index.html keeps a constant name but points at freshly-hashed assets, so a
+      // cached index.html would load the OLD bundle (looks like "no changes").
+      headers.set('Cache-Control', 'no-store, must-revalidate');
       return new Response(res.body, { status: res.status, headers });
     })
     .catch(() => new Response('not found', { status: 404 }));
@@ -127,14 +131,22 @@ function createWindow(): BrowserWindow {
     console.error(`[renderer] process gone: ${details.reason}`);
   });
 
-  if (isDev && process.env.VITE_DEV_SERVER_URL) {
-    void win.loadURL(process.env.VITE_DEV_SERVER_URL);
-    win.webContents.openDevTools();
-  } else {
-    void win.loadURL(`${SCHEME}://app/index.html`);
-    if (isDev) {
+  const load = () => {
+    if (isDev && process.env.VITE_DEV_SERVER_URL) {
+      void win.loadURL(process.env.VITE_DEV_SERVER_URL);
       win.webContents.openDevTools();
+    } else {
+      void win.loadURL(`${SCHEME}://app/index.html`);
+      if (isDev) win.webContents.openDevTools();
     }
+  };
+
+  // In dev, purge any cached renderer first so a rebuild ALWAYS shows — the #1
+  // "my changes aren't showing" cause. Cheap; only runs with --dev.
+  if (isDev) {
+    void win.webContents.session.clearCache().finally(load);
+  } else {
+    load();
   }
 
   return win;
