@@ -16,13 +16,19 @@ const electron = require('electron'); // resolves to the binary path string
 
 const env = { ...process.env };
 if (process.platform === 'linux' && !env.ELECTRON_OZONE_PLATFORM_HINT) {
-  // Native Wayland by default: WebGPU compute (the stem-separation backend) works
-  // on native Wayland here (verified: requestAdapter → amd/rdna-3 device OK), and
-  // X11 ozone is fragile (fails outright when XWayland isn't reachable). The 2D-
-  // compositor GPU-rasterization crash is handled in main.ts WITHOUT disabling
-  // the GPU, so WebGPU stays available. DJ_OZONE=x11 forces XWayland if ever
-  // needed (e.g. a driver where Wayland WebGPU regresses).
-  env.ELECTRON_OZONE_PLATFORM_HINT = process.env.DJ_OZONE === 'x11' ? 'x11' : 'auto';
+  // X11 ozone (XWayland) by default. Chromium itself reports the reason:
+  //   "'--ozone-platform=wayland' is not compatible with Vulkan. Consider
+  //    switching to '--ozone-platform=x11' or disabling Vulkan"
+  // We REQUIRE Vulkan (WebGPU / stem separation), so on native Wayland Chromium
+  // falls back to a slow present path → pinned ~30fps. Running under XWayland
+  // makes Vulkan + the compositor cooperate → full frame rate, GPU accel, and
+  // WebGPU all intact. (Same fix loukai uses.) DJ_WAYLAND=1 forces native Wayland.
+  if (process.env.DJ_WAYLAND === '1') {
+    env.ELECTRON_OZONE_PLATFORM_HINT = 'auto';
+  } else {
+    env.ELECTRON_OZONE_PLATFORM_HINT = 'x11';
+    if (!env.DISPLAY) env.DISPLAY = ':0'; // XWayland runs here
+  }
 }
 
 const args = ['.', ...process.argv.slice(2)];
