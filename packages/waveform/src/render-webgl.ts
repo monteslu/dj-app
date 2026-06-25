@@ -78,9 +78,15 @@ void main() {
     // only smooth the read.
     vec4 t = mix(t0, t1, f);
     float barH = t.a * mid * 0.92;
-    if (abs(y - mid) <= barH) {
-      col = bandColor(t.rgb);
-      if (x < centerX) col *= 0.5;                         // played = dimmed
+    // Anti-aliased bar edge: a hard abs(y-mid) <= barH makes the top edge snap to
+    // the nearest pixel row, so as barH changes sub-pixel while scrolling the edge
+    // flickers up/down by a pixel (the resizing/shimmer weirdness). smoothstep
+    // over a 1px band feathers the edge → stable, clean motion.
+    float edge = 1.0 - smoothstep(barH - 1.0, barH + 1.0, abs(y - mid));
+    if (edge > 0.0) {
+      vec3 bar = bandColor(t.rgb);
+      if (x < centerX) bar *= 0.5;                          // played = dimmed
+      col = mix(col, bar, edge);
     }
   }
 

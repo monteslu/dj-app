@@ -12,10 +12,13 @@ import { reportLaneDraw } from './perf-monitor.js';
 import { onFrame } from './frame-loop.js';
 
 const SR = 48000;
-// Screen pixels per beat — sets the zoom. Same on every deck, so beats are the
-// same width everywhere and synced decks line up. (~64px/beat ≈ 8 beats across a
-// 512px lane.)
-const PIXELS_PER_BEAT = 64;
+// FIXED zoom: source frames per screen pixel. Like Mixxx, the waveform's sample→
+// pixel scale is a CONSTANT and never derives from BPM — deriving it from the live
+// (async-updating, often-0) fileBpm made the whole waveform rescale every frame,
+// which is the shimmering/resizing jank. BPM only drives the beat-grid overlay
+// (drawn from firstBeatFrame + framesPerBeat), not the wave scale. ~512 frames/px
+// ≈ 10.6ms/px at 48k → a few seconds across the lane, scrolls smoothly.
+const FRAMES_PER_PX = 512;
 
 export class WaveformLaneController {
   private gl: WaveformGL | null = null;
@@ -71,16 +74,10 @@ export class WaveformLaneController {
       const framesPerBeat = fileBpm > 0 ? (60 / fileBpm) * sr : 0;
       const fbf = this.bus.get(g, DeckKeys.firstBeatFrame);
 
-      // Beat-relative zoom: one beat = PIXELS_PER_BEAT pixels, ALWAYS. A track beat
-      // spans `framesPerBeat` SOURCE frames (independent of playback rate), and the
-      // playhead position is in source frames, so framesPerPx = framesPerBeat /
-      // PIXELS_PER_BEAT puts exactly one beat per PIXELS_PER_BEAT pixels. The
-      // playhead advances through source frames at the playback rate, so a deck
-      // playing faster scrolls faster — and two synced decks (same effective BPM)
-      // advance source frames at the same beats/sec → identical visual scroll +
-      // aligned grids. (Fixed-px fallback for tracks with no BPM.)
-      const framesPerPx =
-        framesPerBeat > 0 ? framesPerBeat / PIXELS_PER_BEAT : this.framesPerPx;
+      // FIXED zoom — does NOT depend on BPM (see FRAMES_PER_PX). The wave scale is
+      // constant so it never rescales/shimmers; the beat grid below still uses
+      // framesPerBeat for its lines.
+      const framesPerPx = FRAMES_PER_PX;
 
       const params = {
         positionFrames: fraction * frames,
