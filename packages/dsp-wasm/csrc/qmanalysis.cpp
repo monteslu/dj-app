@@ -207,12 +207,13 @@ double bu_calculateBpm(const std::vector<double>& cb, double sr) {
 extern "C" {
 
 /*
- * Run BOTH analyses over planar mono-able stereo.
- *   src_l/src_r : channels (length frames). Mono: src_r == src_l.
+ * Run BOTH analyses over a MONO mix (the caller downmixes — qm only ever uses the
+ * mono mix, so taking one buffer halves the per-track WASM memory vs two channels).
+ *   mono   : downmixed samples (length frames)
  *   frames, sample_rate
  * Writes the g_* results.
  */
-void qm_analyze(const float* src_l, const float* src_r, int frames, int sample_rate) {
+void qm_analyze(const float* mono, int frames, int sample_rate) {
   g_beat_frames.clear();
   g_downbeat_frames.clear();
   g_bpm = 0; g_first_beat_frame = 0; g_confidence = 0; g_key = 0;
@@ -243,7 +244,7 @@ void qm_analyze(const float* src_l, const float* src_r, int frames, int sample_r
     int pos = 0;
     while (pos + windowSize <= frames) {
       for (int i = 0; i < windowSize; i++) {
-        win[i] = 0.5 * ((double)src_l[pos + i] + (double)src_r[pos + i]);
+        win[i] = (double)mono[pos + i];
       }
       dfResults.push_back(df.processTimeDomain(win.data()));
       pos += stepSize;
@@ -298,7 +299,7 @@ void qm_analyze(const float* src_l, const float* src_r, int frames, int sample_r
     std::vector<float> blk(stepSize);
     int pos = 0;
     while (pos + stepSize <= frames) {
-      for (int i = 0; i < stepSize; i++) blk[i] = 0.5f * (src_l[pos + i] + src_r[pos + i]);
+      for (int i = 0; i < stepSize; i++) blk[i] = mono[pos + i];
       down.pushAudioBlock(blk.data());
       pos += stepSize;
     }
@@ -330,7 +331,7 @@ void qm_analyze(const float* src_l, const float* src_r, int frames, int sample_r
     int pos = 0;
     while (pos + blockSize <= frames) {
       for (int i = 0; i < blockSize; i++) {
-        win[i] = 0.5 * ((double)src_l[pos + i] + (double)src_r[pos + i]);
+        win[i] = (double)mono[pos + i];
       }
       int k = keyMode.process(win.data());
       if (k >= 1 && k <= 24) counts[k]++;

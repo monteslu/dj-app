@@ -50,7 +50,7 @@ const modules = [
     defines: ['T_LINUX'],
     exports: ['_peaks_run', '_peaks_malloc', '_peaks_free'],
     growMemory: true,
-    maxMemory: 268435456, // 256MB — runs in the analysis worker pool (N× reserved)
+    maxMemory: 402653184, // 384MB — fits a long track's peaks + band buffers
   },
   {
     name: 'qmanalysis',
@@ -69,7 +69,7 @@ const modules = [
       '_qm_malloc', '_qm_free',
     ],
     growMemory: true,
-    maxMemory: 268435456, // 256MB — runs in the analysis worker pool (N× reserved)
+    maxMemory: 402653184, // 384MB — fits a long track (mono) + qm-dsp working set
   },
 ];
 

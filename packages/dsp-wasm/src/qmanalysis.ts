@@ -15,7 +15,7 @@ interface QmExports {
   memory: WebAssembly.Memory;
   qm_malloc(bytes: number): number;
   qm_free(ptr: number): void;
-  qm_analyze(srcL: number, srcR: number, frames: number, sampleRate: number): void;
+  qm_analyze(mono: number, frames: number, sampleRate: number): void;
   qm_bpm(): number;
   qm_first_beat_frame(): number;
   qm_confidence(): number;
@@ -88,13 +88,19 @@ export class WasmQmAnalysis {
     const ex = this.ex;
     const left = channelData[0]!;
     const right = channelData.length > 1 ? channelData[1]! : left;
-    const srcL = ex.qm_malloc(frames * 4);
-    const srcR = ex.qm_malloc(frames * 4);
-    const f = this.f32();
-    f.set(left.subarray(0, frames), srcL / 4);
-    f.set(right.subarray(0, frames), srcR / 4);
+    // qm only uses the MONO mix → downmix here and pass ONE buffer (halves the WASM
+    // memory vs two full-track channels; a long track was overflowing the heap cap).
+    const monoPtr = ex.qm_malloc(frames * 4);
+    if (monoPtr === 0) {
+      // Heap couldn't grow enough for this track — fail cleanly instead of letting the
+      // C code write out of bounds (which crashes the whole worker with a WASM trap).
+      throw new Error(`qm: out of memory for ${frames} frames (track too long)`);
+    }
+    const heap = this.f32();
+    const base = monoPtr / 4;
+    for (let i = 0; i < frames; i++) heap[base + i] = 0.5 * (left[i]! + right[i]!);
 
-    ex.qm_analyze(srcL, srcR, frames, sampleRate);
+    ex.qm_analyze(monoPtr, frames, sampleRate);
 
     const nBeats = ex.qm_beat_count();
     const beatFrames = new Int32Array(nBeats);
@@ -104,8 +110,7 @@ export class WasmQmAnalysis {
     for (let i = 0; i < nDown; i++) downbeatFrames[i] = ex.qm_downbeat_frame(i);
 
     const k = ex.qm_key();
-    ex.qm_free(srcL);
-    ex.qm_free(srcR);
+    ex.qm_free(monoPtr);
 
     return {
       bpm: ex.qm_bpm(),

@@ -106,6 +106,11 @@ export class WasmPeaks {
     const right = channelData.length > 1 ? channelData[1]! : left;
     const srcL = ex.peaks_malloc(frames * 4);
     const srcR = ex.peaks_malloc(frames * 4);
+    if (srcL === 0 || srcR === 0) {
+      // Fail cleanly rather than letting the C write out of bounds (WASM trap that
+      // crashes the worker). A too-long track for the heap cap.
+      throw new Error(`peaks: out of memory for ${frames} frames (track too long)`);
+    }
     // 4 detail + 4 overview output bands
     const dAll = ex.peaks_malloc(db);
     const dLow = ex.peaks_malloc(db);
