@@ -13,3 +13,4 @@ export {
   type BeatDetectOptions,
 } from './beatdetect.js';
 export { WasmPeaks, type BandPeaks, type PeakSet } from './peaks.js';
+export { WasmQmAnalysis, type QmResult } from './qmanalysis.js';

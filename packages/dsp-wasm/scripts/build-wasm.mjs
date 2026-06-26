@@ -7,9 +7,20 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+/** Recursively collect files under `dir` matching one of the extensions. */
+function walkExt(dir, exts) {
+  const out = [];
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, e.name);
+    if (e.isDirectory()) out.push(...walkExt(full, exts));
+    else if (exts.some((x) => e.name.endsWith(x))) out.push(full);
+  }
+  return out;
+}
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
@@ -54,20 +65,48 @@ const modules = [
     exports: ['_peaks_run', '_peaks_malloc', '_peaks_free'],
     growMemory: true,
   },
+  {
+    name: 'qmanalysis',
+    src: 'qmanalysis.cpp',
+    // Mixxx's REAL analysis (Queen Mary DSP): GetKeyMode (key) + DetectionFunction/
+    // TempoTrackV2 (beat) + DownBeat (real downbeats/measures). Compiles the whole
+    // vendored qm-dsp subtree + KissFFT. C++ (emscripten handles it).
+    glob: ['qm-dsp/dsp/**/*.cpp', 'qm-dsp/maths/**/*.cpp', 'qm-dsp/base/**/*.cpp', 'qm-dsp/ext/kissfft/**/*.c'],
+    includeDirs: ['qm-dsp', 'qm-dsp/ext/kissfft', 'qm-dsp/ext/kissfft/tools'],
+    // qm-dsp configures KissFFT for double precision (Mixxx: kiss_fft_scalar=double).
+    defines: ['kiss_fft_scalar=double'],
+    cpp: true,
+    exports: [
+      '_qm_analyze', '_qm_bpm', '_qm_first_beat_frame', '_qm_confidence', '_qm_key',
+      '_qm_beat_count', '_qm_beat_frame', '_qm_downbeat_count', '_qm_downbeat_frame',
+      '_qm_malloc', '_qm_free',
+    ],
+    growMemory: true,
+  },
 ];
 
 for (const m of modules) {
   const out = join(wasmDir, `${m.name}-standalone.wasm`);
-  console.log(`compiling ${m.src} → ${m.name}-standalone.wasm (SIMD, O3)`);
+  // Expand any glob dirs (qm-dsp) into concrete source files.
+  const globSrcs = (m.glob ?? []).flatMap((g) => {
+    const base = join(csrc, g.split('/**')[0]);
+    const exts = g.endsWith('*.c') ? ['.c'] : ['.cpp', '.c'];
+    return walkExt(base, exts);
+  });
+  const sources = [join(csrc, m.src), ...((m.extraSrc ?? []).map((s) => join(csrc, s))), ...globSrcs];
+  console.log(`compiling ${m.src} (+${sources.length - 1} deps) → ${m.name}-standalone.wasm (SIMD, O3)`);
   execFileSync(
-    'emcc',
+    m.cpp ? 'em++' : 'emcc',
     [
-      join(csrc, m.src),
-      ...((m.extraSrc ?? []).map((s) => join(csrc, s))),
+      ...sources,
+      ...((m.includeDirs ?? []).flatMap((d) => ['-I', join(csrc, d)])),
       ...((m.defines ?? []).map((d) => `-D${d}`)),
       '-O3',
       '-msimd128',
       '--no-entry',
+      // qm-dsp uses throw in a couple of spots; keep exceptions for C++ modules
+      // (offline analysis, not perf-critical re: exception support).
+      ...(m.cpp ? ['-std=c++17'] : []),
       '-s', 'STANDALONE_WASM=1',
       '-s', `EXPORTED_FUNCTIONS=${JSON.stringify(m.exports)}`,
       '-s', `ALLOW_MEMORY_GROWTH=${m.growMemory ? 1 : 0}`,
