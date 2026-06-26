@@ -120,10 +120,25 @@ export async function separateStems(
     onLog: (phase: string, m: string) => onLog(`[demucs:${phase}] ${m}`),
   });
   await proc.loadModel(modelBuf);
-  onLog('separating on WebGPU — htdemucs …');
+  // Try to confirm ORT actually bound the WebGPU EP (not a silent WASM fallback).
+  // onnxruntime-web exposes a webgpu device on its env once a webgpu session inits;
+  // if it's present we KNOW the GPU path is live. (demucs-web hides the session, so
+  // this + the realtime factor below are our definitive signals.)
+  const webgpuDevice = (ort.env as { webgpu?: { device?: unknown } }).webgpu?.device;
+  onLog(`[stems] ort webgpu device after loadModel: ${webgpuDevice ? 'PRESENT' : 'absent'}`);
+
+  onLog('separating — htdemucs …');
   const t0 = performance.now();
   const stems = await proc.separate(left, right);
-  onLog(`separation done in ${((performance.now() - t0) / 1000).toFixed(1)}s`);
+  const sec = (performance.now() - t0) / 1000;
+  const audioSec = left.length / 44100; // demucs runs at 44.1k
+  const rtf = audioSec / sec; // >1 = faster than realtime
+  // A WebGPU run is many× realtime; a CPU/WASM run is typically SLOWER than realtime.
+  // This is the definitive EP verdict the app can see at runtime.
+  const ep = webgpuDevice ? 'webgpu (device present)' : rtf >= 1.5 ? 'webgpu (by speed)' : 'WASM/CPU (SLOW — likely silent fallback!)';
+  onLog(
+    `[stems] separation done in ${sec.toFixed(1)}s — ${rtf.toFixed(2)}× realtime → EP = ${ep}`,
+  );
   onProgress(STEMS.reduce((a, s) => ({ ...a, [s]: 1 }), {}));
   return stems;
 }
