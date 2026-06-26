@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { ControlBus, standardControls, deck as deckGroup, DeckKeys } from '@dj/control-bus';
 import { SyncController } from './sync-controller.js';
-import { makeGrid, beatDistance } from './beatgrid.js';
+import { makeGrid, beatDistance, computeSnapTarget } from './beatgrid.js';
 
 const SR = 48000;
 
@@ -57,8 +57,10 @@ describe('SYNC end-to-end: different BPM decks lock audibly AND visually', () =>
     const beforeErr = Math.abs(beatDistance(lg, pos[0]) - beatDistance(fg, pos[1]));
     expect(Math.min(beforeErr, 1 - beforeErr), 'starts off-beat').toBeGreaterThan(0.2);
 
-    // press SYNC on the follower → the controller's real snap fires (hard jump)
+    // press SYNC: the controller matches tempo; the worklet does the phase snap on
+    // its own exact position. Simulate that snap here with the same pure function.
     bus.set(g2, DeckKeys.syncEnabled, 1);
+    pos[1] = computeSnapTarget(lg, pos[0], fg, pos[1]);
 
     // AUDIO: effective tempo matches AND the follower is now on the leader's BEAT.
     expect(followerBpm * rate[1]!, 'follower effective BPM == leader').toBeCloseTo(leaderBpm, 3);

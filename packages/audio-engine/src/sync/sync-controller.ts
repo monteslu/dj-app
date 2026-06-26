@@ -110,19 +110,13 @@ export class SyncController {
     const factor = this.halfDoubleFactor(followerBpm, leaderBpm);
     this.deps.setRateRatio(deckIndex, leaderBpm / (followerBpm * factor));
 
-    // instant phase snap only when both grids are known
-    if (!fg || !lg) return;
-
-    // SNAP: instantly seek the follower so it lands on the leader's EXACT beat
-    // phase (a hard jump to the same beat — Mixxx aligns on beat phase, not bars;
-    // automatic downbeat detection is unreliable, so the bar is the DJ's to nudge).
-    const leaderPhase = beatDistance(lg, this.deps.positionFrames(leaderIdx));
-    const followerFrame = this.deps.positionFrames(deckIndex);
-    const target = alignedFrame(fg, followerFrame, leaderPhase);
-    const total = this.deps.trackFrames(deckIndex);
-    if (total > 0) {
-      this.deps.seekFrames(deckIndex, Math.max(0, Math.min(total - 1, target)));
-    }
+    // NOTE: the PHASE SNAP now happens in the AudioWorklet (engine.worklet
+    // phaseSnap), using each deck's SAMPLE-ACCURATE position — not here. Doing it
+    // from the renderer used a stale (~10ms-old) UI position + an async seek, so it
+    // never landed precisely. The worklet snaps on the same syncEnabled 0→1 edge.
+    // This method only matches TEMPO (the rate ratio set above).
+    void fg;
+    void lg;
   }
 
   /**

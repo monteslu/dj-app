@@ -180,6 +180,11 @@ export class Engine {
     return {
       play: r(DeckKeys.play),
       playPosition: r(DeckKeys.playPosition),
+      // grid + sync so the worklet can phase-snap with its OWN exact position
+      // (Mixxx does the snap in the realtime engine, not from a stale UI read).
+      fileBpm: r(DeckKeys.fileBpm),
+      firstBeatFrame: r(DeckKeys.firstBeatFrame),
+      syncEnabled: r(DeckKeys.syncEnabled),
       rate: r(DeckKeys.rate),
       rateRange: r(DeckKeys.rateRange),
       rateDirection: r(DeckKeys.rateDirection),

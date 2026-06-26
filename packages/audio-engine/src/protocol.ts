@@ -14,6 +14,9 @@ import type { SabLayout } from '@dj/control-bus';
 export interface DeckControlIndices {
   play: number;
   playPosition: number;
+  fileBpm: number;
+  firstBeatFrame: number;
+  syncEnabled: number;
   rate: number;
   rateRange: number;
   rateDirection: number;

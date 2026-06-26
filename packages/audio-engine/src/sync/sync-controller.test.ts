@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ControlBus, standardControls, deck as deckGroup, DeckKeys } from '@dj/control-bus';
 import { SyncController } from './sync-controller.js';
-import { makeGrid, beatDistance } from './beatgrid.js';
+import { makeGrid, beatDistance, computeSnapTarget } from './beatgrid.js';
 
 const SR = 48000;
 
@@ -45,24 +45,15 @@ describe('SyncController', () => {
     expect(s.bus.get(g, DeckKeys.beatDistance)).toBeCloseTo(0.5, 3);
   });
 
-  it('phase-snaps the follower to the leader on SYNC enable', () => {
-    const g1 = deckGroup(1);
-    const g2 = deckGroup(2);
-    // leader (deck 1): 120bpm, on a beat (phase 0)
-    s.bus.set(g1, DeckKeys.fileBpm, 120);
-    s.bus.set(g1, DeckKeys.firstBeatFrame, 0);
-    s.bus.set(g1, DeckKeys.play, 1);
-    s.pos[0] = 48000; // exactly on beat 2 → phase 0
-    // follower (deck 2): 120bpm but off-phase
-    s.bus.set(g2, DeckKeys.fileBpm, 120);
-    s.bus.set(g2, DeckKeys.firstBeatFrame, 0);
-    s.pos[1] = 48000 + 6000; // phase 0.25
-
-    s.bus.set(g2, DeckKeys.syncEnabled, 1); // triggers onSyncToggle
-
-    // follower should have been seeked to phase 0 (matching leader)
+  it('phase snap (worklet logic) lands the follower on the leader beat', () => {
+    // The actual SEEK now happens in the AudioWorklet (sample-accurate position),
+    // via computeSnapTarget — the same pure function. Verify it here.
+    const lg = makeGrid(120, 0, SR)!;
     const fg = makeGrid(120, 0, SR)!;
-    expect(beatDistance(fg, s.pos[1]!)).toBeCloseTo(0, 3);
+    const leaderPos = 48000; // on a beat (phase 0)
+    const followerPos = 48000 + 6000; // phase 0.25
+    const target = computeSnapTarget(lg, leaderPos, fg, followerPos);
+    expect(beatDistance(fg, target)).toBeCloseTo(0, 3); // snapped to phase 0
   });
 
   it('matches tempo with half/double on SYNC (140 follows 70)', () => {

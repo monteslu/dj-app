@@ -25,6 +25,7 @@ import { wrapSab, sabRead, sabWrite, type SabLayout } from '@dj/control-bus';
 import { DeckPlayback } from './deck-playback.js';
 import { calculateSpeed } from './rate.js';
 import { VuMeter } from './vu-meter.js';
+import { makeGrid, computeSnapTarget } from './sync/beatgrid.js';
 import type {
   DeckControlIndices,
   EngineMessage,
@@ -45,6 +46,8 @@ declare function registerProcessor(
   name: string,
   ctor: new (options?: unknown) => AudioWorkletProcessor,
 ): void;
+// AudioWorkletGlobalScope provides the engine sample rate.
+declare const sampleRate: number;
 
 interface DeckSlot {
   playback: DeckPlayback;
@@ -54,6 +57,8 @@ interface DeckSlot {
   lastVolume: number;
   /** How often to publish play position back to the bus (in blocks). */
   positionPublishCounter: number;
+  /** Previous syncEnabled, to detect the 0→1 edge that triggers the phase snap. */
+  lastSyncEnabled: boolean;
 }
 
 const POSITION_PUBLISH_EVERY = 4; // ~every 4 blocks (~11ms @48k/128) → smooth UI, low churn
@@ -81,6 +86,7 @@ class EngineProcessor extends AudioWorkletProcessor {
           vu: new VuMeter(),
           lastVolume: 1,
           positionPublishCounter: 0,
+          lastSyncEnabled: false,
         }));
         this.vuCounter = 0;
         break;
@@ -134,11 +140,58 @@ class EngineProcessor extends AudioWorkletProcessor {
     }
   }
 
+  /**
+   * Phase-snap a follower onto the leader's exact beat, IN THE WORKLET, using each
+   * deck's sample-accurate position (not a stale UI read). Runs on the syncEnabled
+   * 0→1 edge. This is the Mixxx architecture: the snap happens in the realtime
+   * engine, so it actually lands precisely. (Mixxx: getNearestPositionInPhase →
+   * seekExact, ported in alignedFrame.)
+   */
+  private phaseSnap(control: SabLayout): void {
+    for (let d = 0; d < this.decks.length; d++) {
+      const slot = this.decks[d]!;
+      const idx = slot.indices;
+      if (idx.syncEnabled === undefined) continue;
+      const on = sabRead(control, idx.syncEnabled) > 0.5;
+      const edge = on && !slot.lastSyncEnabled;
+      slot.lastSyncEnabled = on;
+      if (!edge) continue;
+
+      // find a leader: another deck with a bpm (prefer one that's playing)
+      let leader = -1;
+      for (let o = 0; o < this.decks.length; o++) {
+        if (o === d) continue;
+        const oi = this.decks[o]!.indices;
+        if (oi.fileBpm === undefined || sabRead(control, oi.fileBpm) <= 0) continue;
+        if (leader < 0) leader = o;
+        if (sabRead(control, oi.play) > 0.5) { leader = o; break; }
+      }
+      if (leader < 0) continue;
+
+      const li = this.decks[leader]!.indices;
+      const leaderBpm = sabRead(control, li.fileBpm!);
+      const followerBpm = idx.fileBpm !== undefined ? sabRead(control, idx.fileBpm) : 0;
+      if (leaderBpm <= 0 || followerBpm <= 0) continue;
+
+      const lg = makeGrid(leaderBpm, li.firstBeatFrame !== undefined ? Math.max(0, sabRead(control, li.firstBeatFrame)) : 0, sampleRate);
+      const fg = makeGrid(followerBpm, idx.firstBeatFrame !== undefined ? Math.max(0, sabRead(control, idx.firstBeatFrame)) : 0, sampleRate);
+      if (!lg || !fg) continue;
+
+      // EXACT positions straight from the playback (sample-accurate, not the bus)
+      const leaderPos = this.decks[leader]!.playback.getPositionFrames();
+      const followerPos = slot.playback.getPositionFrames();
+      const target = computeSnapTarget(lg, leaderPos, fg, followerPos);
+      slot.playback.seekFrames(target);
+      sabWrite(control, idx.playPosition, slot.playback.getPositionFraction());
+    }
+  }
+
   override process(_inputs: Float32Array[][], outputs: Float32Array[][]): boolean {
     const control = this.control;
     if (!control) {
       return true;
     }
+    this.phaseSnap(control);
 
     for (let d = 0; d < this.decks.length; d++) {
       const slot = this.decks[d]!;

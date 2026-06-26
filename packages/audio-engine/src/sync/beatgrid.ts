@@ -48,6 +48,22 @@ export function nearestBeatFrame(grid: Grid, frame: number): number {
 }
 
 /**
+ * The phase snap as ONE pure function: given both decks' grids + exact positions,
+ * return the follower's target frame so its beat lands on the leader's. Used by the
+ * worklet (with sample-accurate positions) AND the tests. Returns the follower's
+ * position unchanged if a grid is missing.
+ */
+export function computeSnapTarget(
+  leaderGrid: Grid | null,
+  leaderFrame: number,
+  followerGrid: Grid | null,
+  followerFrame: number,
+): number {
+  if (!leaderGrid || !followerGrid) return followerFrame;
+  return alignedFrame(followerGrid, followerFrame, beatDistance(leaderGrid, leaderFrame));
+}
+
+/**
  * Phase-align: seek the follower so its beat fraction matches the leader's
  * `targetPhase` (0..1). PORTED FROM MIXXX (bpmcontrol.cpp getNearestPositionInPhase):
  * anchor to a concrete beat boundary chosen by whether THIS and the OTHER deck are

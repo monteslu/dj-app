@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { ControlBus, standardControls, deck as deckGroup, DeckKeys } from '@dj/control-bus';
 import { SyncController } from './sync-controller.js';
-import { makeGrid, beatDistance } from './beatgrid.js';
+import { makeGrid, beatDistance, computeSnapTarget } from './beatgrid.js';
 
 const SR = 48000;
 
@@ -30,10 +30,13 @@ describe('SyncController phase hold over time', () => {
     pos[0] = 100000;            // leader
     pos[1] = 100000 + fpb * 0.25; // follower 0.25 beat ahead
 
-    bus.set(g2, DeckKeys.syncEnabled, 1); // instant snap on enable
+    bus.set(g2, DeckKeys.syncEnabled, 1); // controller now only matches tempo
 
     const fg = makeGrid(120, 0, SR)!;
     const lg = makeGrid(120, 0, SR)!;
+    // The phase SNAP runs in the worklet (sample-accurate); simulate it here with
+    // the same pure function so we can then verify the hold.
+    pos[1] = computeSnapTarget(lg, pos[0]!, fg, pos[1]!);
     // after the snap, phases should match
     const err = Math.abs(beatDistance(fg, pos[1]!) - beatDistance(lg, pos[0]!));
     expect(Math.min(err, 1 - err)).toBeCloseTo(0, 2);
