@@ -690,6 +690,53 @@ body,
   align-items: center;
   flex-wrap: wrap;
 }
+
+/* ── stem mixer (live mashups) ─────────────────────────────────────── */
+.stem-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 6px;
+  padding: 6px;
+  border-radius: 6px;
+  background: #0b0e15;
+  border: 1px solid #1c2330;
+}
+.stem-control {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  border-top: 2px solid var(--stem);
+  padding-top: 4px;
+}
+.stem-control.muted {
+  opacity: 0.45;
+}
+.stem-name {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--stem);
+}
+.stem-fader {
+  width: 100%;
+  accent-color: var(--stem);
+}
+.stem-buttons {
+  display: flex;
+  gap: 4px;
+}
+.stem-mute.active {
+  background: #5a1f1f;
+  color: #ff8080;
+  border-color: rgba(255, 93, 93, 0.5);
+}
+.stem-solo.active {
+  background: #1f4a5a;
+  color: #80d0ff;
+  border-color: rgba(93, 184, 255, 0.5);
+}
 .loop-sep {
   width: 1px;
   height: 18px;

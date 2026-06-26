@@ -9,6 +9,7 @@ import { deck as deckGroup, DeckKeys } from '@dj/control-bus';
 import { useDj, useControl, useControlValue } from '../dj-context.js';
 import { HotcueRow } from './HotcueRow.js';
 import { LoopRow } from './LoopRow.js';
+import { StemRow } from './StemRow.js';
 import { Platter } from './Platter.js';
 import { OverviewStrip } from './OverviewStrip.js';
 import { useDeckTrack } from '../deck-state.js';
@@ -258,6 +259,7 @@ export function Deck({ deckIndex, side = 'left' }: Props): React.JSX.Element {
 
       <HotcueRow deckIndex={deckIndex} />
       <LoopRow deckIndex={deckIndex} />
+      <StemRow deckIndex={deckIndex} />
     </section>
   );
 }
