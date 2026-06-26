@@ -60,16 +60,20 @@ export class AnalysisQueue {
     for (const l of this.listeners) l();
   }
 
-  /** Enqueue track ids (dedup) and start processing if idle. */
-  enqueue(ids: number[]): void {
+  /** Enqueue track ids (dedup) and start processing if idle. Returns how many were added. */
+  enqueue(ids: number[]): number {
     const known = new Set(this.queue);
+    let added = 0;
     for (const id of ids) {
       if (!known.has(id) && !this.inFlight.has(id) && !this.status.done.has(id)) {
         this.queue.push(id);
+        known.add(id);
+        added++;
       }
     }
     this.emit();
     void this.run();
+    return added;
   }
 
   /** Pull the not-yet-analyzed set from the DB and queue it (on load / after scan). */
@@ -96,19 +100,22 @@ export class AnalysisQueue {
     }
     console.log(`[analyze] reanalyzeAll: DB reset analyzed_at=0 on ${count} tracks`);
     this.status.done.clear();
-    // libraryUnanalyzed caps at 1000; pull pages until the DB is drained.
-    let queued = 0;
+    // Pull the (now all-unanalyzed) set and queue it. enqueue() dedups against what's
+    // already queued/in-flight (e.g. the startup kick may have grabbed some already),
+    // so we count both what WE add and what's already pending — the real backlog.
+    let added = 0;
     for (;;) {
       const ids = await window.dj.libraryUnanalyzed(1000);
-      const fresh = ids.filter((id) => !this.inFlight.has(id) && !this.queue.includes(id));
-      if (fresh.length === 0) break;
-      this.enqueue(fresh);
-      queued += fresh.length;
+      if (ids.length === 0) break;
+      added += this.enqueue(ids);
       if (ids.length < 1000) break;
     }
-    console.log(`[analyze] reanalyzeAll: queued ${queued} tracks for analysis`);
-    if (queued === 0 && count > 0) {
-      console.warn('[analyze] reset tracks but queued 0 — libraryUnanalyzed returned nothing?');
+    const pending = this.queue.length + this.inFlight.size;
+    console.log(
+      `[analyze] reanalyzeAll: ${added} newly queued (${pending} total pending incl. already-running)`,
+    );
+    if (pending === 0 && count > 0) {
+      console.warn('[analyze] reset tracks but nothing pending — libraryUnanalyzed returned nothing?');
     }
     return count;
   }
