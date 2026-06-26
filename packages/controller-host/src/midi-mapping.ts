@@ -27,6 +27,10 @@ export interface MidiInputOptions {
   button?: boolean;
   switchMode?: boolean;
   fourteenBit?: boolean;
+  fourteenBitMsb?: boolean;
+  fourteenBitLsb?: boolean;
+  softTakeover?: boolean;
+  selectKnob?: boolean;
   script?: boolean;
 }
 
@@ -70,16 +74,22 @@ function asArray<T>(v: T | T[] | undefined): T[] {
 function parseOptions(opts: Record<string, unknown> | undefined): MidiInputOptions {
   const o: MidiInputOptions = {};
   if (!opts) return o;
-  // fast-xml-parser turns empty self-closing tags into empty strings/objects.
-  const has = (k: string) => k in opts;
+  // fast-xml-parser turns empty self-closing tags into empty strings/objects. Match
+  // option names CASE-INSENSITIVELY — Mixxx mappings use mixed case (<Script-binding/>,
+  // <Spread64/>, <Soft-takeover/>, <Button/>, etc.) and a case-sensitive check drops them.
+  const keys = new Set(Object.keys(opts).map((k) => k.toLowerCase()));
+  const has = (k: string) => keys.has(k.toLowerCase());
   if (has('invert')) o.invert = true;
   if (has('diff')) o.diff = true;
   if (has('rot64') || has('rot64inv') || has('rot64fast')) o.rot64 = true;
   if (has('spread64')) o.spread64 = true;
   if (has('button')) o.button = true;
   if (has('switch')) o.switchMode = true;
-  if (has('fourteen-bit-msb') || has('fourteen-bit-lsb')) o.fourteenBit = true;
-  if (has('script-binding') || has('Script-Binding')) o.script = true;
+  if (has('soft-takeover')) o.softTakeover = true;
+  if (has('selectknob')) o.selectKnob = true;
+  if (has('fourteen-bit-msb')) o.fourteenBit = o.fourteenBitMsb = true;
+  if (has('fourteen-bit-lsb')) o.fourteenBit = o.fourteenBitLsb = true;
+  if (has('script-binding')) o.script = true;
   return o;
 }
 

@@ -41,10 +41,17 @@ export interface MidiRouterDeps {
 export class MidiRouter {
   private readonly inByKey = new Map<number, MidiInputControl>();
   private readonly outConnections: Array<() => void> = [];
+  /** Per 14-bit control (group.key): the last MSB/LSB byte, combined on each message. */
+  private readonly fourteenBit = new Map<string, { msb: number; lsb: number }>();
 
   constructor(private readonly deps: MidiRouterDeps) {
     for (const c of deps.mapping.controls) {
       this.inByKey.set(midiKey(c.status, c.midino), c);
+      // Auto-engage soft-takeover for controls that declare the <soft-takeover/> option
+      // (Mixxx does this from the mapping, not just from script calls).
+      if (c.options.softTakeover && !c.isScript) {
+        this.deps.engine.softTakeover(c.group, c.key, true);
+      }
     }
     this.connectOutputs();
   }
@@ -72,6 +79,24 @@ export class MidiRouter {
     if (!bus.has(control.group, control.key)) {
       return;
     }
+
+    // 14-bit (hi-res) controls: two messages (MSB + LSB) share group+key. Combine the
+    // latest of each into a 14-bit value (0..16383 → 0..1) for jog wheels / pitch faders.
+    const o = control.options;
+    if (o.fourteenBitMsb || o.fourteenBitLsb) {
+      const id = `${control.group}.${control.key}`;
+      const st = this.fourteenBit.get(id) ?? { msb: 0, lsb: 0 };
+      if (o.fourteenBitMsb) st.msb = data2;
+      else st.lsb = data2;
+      this.fourteenBit.set(id, st);
+      const combined = ((st.msb << 7) | st.lsb) / 16383; // 0..1
+      const param = o.invert ? 1 - combined : combined;
+      if (engine.softTakeoverAllows(control.group, control.key, param)) {
+        engine.setParameter(control.group, control.key, param);
+      }
+      return;
+    }
+
     const prevParam = engine.getParameter(control.group, control.key);
     const newParam = computeMidiParameter(data2, prevParam, control.options);
     // Soft-takeover: if active for this control, ignore the value until the physical

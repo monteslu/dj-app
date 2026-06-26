@@ -17,7 +17,7 @@ export interface MidiOptions {
   button?: boolean;
   /** Switch: 0/127 → 0/1. */
   switchMode?: boolean;
-  /** 14-bit (paired MSB/LSB) — handled by the caller; flagged here. */
+  /** 14-bit (paired MSB/LSB) — combined by the router; flagged here. */
   fourteenBit?: boolean;
   /** Route to a script function instead of a control. */
   script?: boolean;
