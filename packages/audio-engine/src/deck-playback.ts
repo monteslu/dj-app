@@ -37,6 +37,9 @@ export class DeckPlayback {
 
   private keylock = false;
   private keylockScaler: Scaler | null = null;
+  /** The keylock scaler's own source read cursor, decoupled from the authoritative
+   *  `position` (which advances at the exact commanded rate). Kept in sync on seek. */
+  private scalerCursor = 0;
 
   /** The WASM+SIMD resampler — the real-time read path (replaces the JS loop). */
   private readonly wasm = new WasmResampler();
@@ -54,6 +57,7 @@ export class DeckPlayback {
   loadTrack(track: DeckTrack): void {
     this.track = track;
     this.position = 0;
+    this.scalerCursor = 0;
     this.baseRate = track.sampleRate / this.engineSampleRate;
     // Upload planar stereo into the WASM heap (mono → duplicate to both channels).
     const left = track.channelData[0]!;
@@ -65,6 +69,7 @@ export class DeckPlayback {
   eject(): void {
     this.track = null;
     this.position = 0;
+    this.scalerCursor = 0;
     this.wasm.clearSource();
     this.keylockScaler?.reset();
   }
@@ -93,6 +98,7 @@ export class DeckPlayback {
       return;
     }
     this.position = Math.max(0, Math.min(frame, this.track.frames));
+    this.scalerCursor = this.position; // scaler reads from the new spot after a jump
     // A seek invalidates the keylock scaler's buffered/primed state.
     this.keylockScaler?.reset();
   }
@@ -203,10 +209,33 @@ export class DeckPlayback {
     if (useKeylock) {
       const scaler = this.keylockScaler!;
       scaler.setRatios(speed, 1); // tempo = speed, pitch held
-      // The scaler pulls source resampled to engine rate at ORIGINAL pitch
-      // (baseRate only — tempo is applied by the scaler, not the pull).
-      const pull: SourcePull = (chans, n) => this.pullResampled(chans, n, this.baseRate);
+      // The scaler reads source through its OWN cursor (scalerCursor) so its internal
+      // buffering/latency stays self-consistent and glitch-free. The pull advances
+      // that cursor, NOT the authoritative playback position.
+      const pull: SourcePull = (chans, n) => {
+        const saved = this.position;
+        this.position = this.scalerCursor;
+        const produced = this.pullResampled(chans, n, this.baseRate);
+        this.scalerCursor = this.position;
+        this.position = saved;
+        return produced;
+      };
       const flowing = scaler.process(outputs, numFrames, pull);
+      // CRITICAL for beat sync (Mixxx enginebufferscalest.cpp: readFramesProcessed +=
+      // effectiveRate * frames): advance the authoritative position by the EXACT
+      // commanded amount (speed × numFrames), NOT by the scaler's chunky/buffered
+      // source consumption. SoundTouch pulls source in blocks with internal latency,
+      // so a consumption-based position drifts ~2% off the true rate and jitters by a
+      // pull-block — which made two keylocked decks drift out of beat lock. The exact
+      // advance keeps position truthful for grid/sync/waveform/cue/loop.
+      let next = this.position + speed * numFrames;
+      // Wrap the authoritative position inside an active loop (the scaler's cursor
+      // wraps independently via pullResampled's loop handling).
+      if (this.loopEnabled && this.loopEnd > this.loopStart && next >= this.loopEnd) {
+        const len = this.loopEnd - this.loopStart;
+        next = this.loopStart + ((next - this.loopStart) % len);
+      }
+      this.position = Math.min(track.frames, next);
       // An active loop never "ends" at the track tail.
       return flowing && (this.loopEnabled || this.position < track.frames);
     }
