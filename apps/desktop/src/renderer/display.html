@@ -14,10 +14,24 @@
         font-family: 'Inter', system-ui, sans-serif;
         overflow: hidden;
       }
+      #viz,
       #scope {
+        position: fixed;
+        inset: 0;
         display: block;
         width: 100vw;
         height: 100vh;
+      }
+      /* Butterchurn fills the screen; the scope is a thin fallback shown only when
+         Butterchurn isn't available. */
+      #scope {
+        display: none;
+      }
+      body.no-butterchurn #scope {
+        display: block;
+      }
+      body.no-butterchurn #viz {
+        display: none;
       }
       #meta {
         position: fixed;
@@ -46,9 +60,14 @@
     </style>
   </head>
   <body>
+    <canvas id="viz"></canvas>
     <canvas id="scope"></canvas>
     <div id="meta"></div>
     <div id="status">waiting for data…</div>
+    <!-- Butterchurn (MilkDrop) — loaded as globals window.butterchurn / window.butterchurnPresets.
+         These render ONLY here, in the display window — never in the dj-app. -->
+    <script src="/butterchurn.min.js"></script>
+    <script src="/butterchurnPresets.min.js"></script>
     <script type="module" src="./display.ts"></script>
   </body>
 </html>
