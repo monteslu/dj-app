@@ -55,6 +55,157 @@ static const double kStepSecs = 0.01161;       /* detection function step */
 static const double kMaxBinSizeHz = 50.0;      /* → window size */
 static const float kTuningFreqHz = 440.0f;
 
+/* =================================================================================
+ * BeatUtils::calculateBpm — ported VERBATIM from Mixxx src/track/beatutils.cpp so our
+ * BPM matches Mixxx exactly (constant-region detection + ironing + musical rounding).
+ * This is what fixes the octave/2× errors a naive median-IBI produces. Operates on
+ * the beat positions (in frames). ================================================= */
+} /* close extern "C" for the C++ helpers below */
+
+namespace {
+constexpr double kMaxSecsPhaseError = 0.025;
+constexpr double kMaxSecsPhaseErrorSum = 0.1;
+constexpr int kMaxOutliersCount = 1;
+constexpr int kMinRegionBeatCount = 16;
+
+struct ConstRegion { double firstBeat; double beatLength; };
+
+double bu_trySnap(double minBpm, double centerBpm, double maxBpm, double fraction) {
+  double snap = round(centerBpm * fraction) / fraction;
+  return (snap > minBpm && snap < maxBpm) ? snap : 0.0; /* 0 = no snap */
+}
+
+double bu_roundBpmWithinRange(double minBpm, double centerBpm, double maxBpm) {
+  double s = bu_trySnap(minBpm, centerBpm, maxBpm, 1.0); if (s) return s;
+  if (centerBpm < 85.0) { s = bu_trySnap(minBpm, centerBpm, maxBpm, 2.0); if (s) return s; }
+  if (centerBpm > 127.0) { s = bu_trySnap(minBpm, centerBpm, maxBpm, 2.0 / 3.0); if (s) return s; }
+  s = bu_trySnap(minBpm, centerBpm, maxBpm, 3.0); if (s) return s;
+  s = bu_trySnap(minBpm, centerBpm, maxBpm, 12.0); if (s) return s;
+  return centerBpm;
+}
+
+/* retrieveConstRegions (beatutils.cpp) — coarse beats (frames) → constant regions. */
+std::vector<ConstRegion> bu_retrieveConstRegions(const std::vector<double>& cb, double sr) {
+  std::vector<ConstRegion> regions;
+  if (cb.size() < 2) return regions;
+  const double maxPhaseError = kMaxSecsPhaseError * sr;
+  const double maxPhaseErrorSum = kMaxSecsPhaseErrorSum * sr;
+  int leftIndex = 0;
+  int rightIndex = (int)cb.size() - 1;
+  while (leftIndex < (int)cb.size() - 1) {
+    double meanBeatLength = (cb[rightIndex] - cb[leftIndex]) / (rightIndex - leftIndex);
+    int outliers = 0;
+    double ironedBeat = cb[leftIndex];
+    double phaseErrorSum = 0;
+    int i = leftIndex + 1;
+    for (; i <= rightIndex; ++i) {
+      ironedBeat += meanBeatLength;
+      double phaseError = ironedBeat - cb[i];
+      phaseErrorSum += phaseError;
+      if (fabs(phaseError) > maxPhaseError) {
+        outliers++;
+        if (outliers > kMaxOutliersCount || i == leftIndex + 1) break;
+      }
+      if (fabs(phaseErrorSum) > maxPhaseErrorSum) break;
+    }
+    if (i > rightIndex) {
+      double regionBorderError = 0;
+      if (rightIndex > leftIndex + 2) {
+        double firstBeatLength = cb[leftIndex + 1] - cb[leftIndex];
+        double lastBeatLength = cb[rightIndex] - cb[rightIndex - 1];
+        regionBorderError = fabs(firstBeatLength + lastBeatLength - (2 * meanBeatLength));
+      }
+      if (regionBorderError < maxPhaseError / 2) {
+        regions.push_back({cb[leftIndex], meanBeatLength});
+        leftIndex = rightIndex;
+        rightIndex = (int)cb.size() - 1;
+        continue;
+      }
+    }
+    rightIndex--;
+  }
+  regions.push_back({cb.back(), 0});
+  return regions;
+}
+
+/* makeConstBpm (beatutils.cpp) — pick the longest constant region, extend to similar
+ * regions at start/end, then round within the phase-error range. Returns BPM. */
+double bu_makeConstBpm(const std::vector<ConstRegion>& cr, double sr) {
+  if (cr.empty()) return 0;
+  int midRegion = 0;
+  double longestLen = 0, longestBeatLen = 0;
+  for (int i = 0; i < (int)cr.size() - 1; ++i) {
+    double len = cr[i + 1].firstBeat - cr[i].firstBeat;
+    if (len > longestLen) { longestLen = len; longestBeatLen = cr[i].beatLength; midRegion = i; }
+  }
+  if (longestLen == 0) return 0;
+  int longestNumBeats = (int)((longestLen / longestBeatLen) + 0.5);
+  if (longestNumBeats < 1) return 0;
+  double lenMin = longestBeatLen - ((kMaxSecsPhaseError * sr) / longestNumBeats);
+  double lenMax = longestBeatLen + ((kMaxSecsPhaseError * sr) / longestNumBeats);
+  int startRegion = midRegion;
+  /* extend toward the start */
+  for (int i = 0; i < midRegion; ++i) {
+    double len = cr[i + 1].firstBeat - cr[i].firstBeat;
+    int nb = (int)((len / cr[i].beatLength) + 0.5);
+    if (nb < kMinRegionBeatCount) continue;
+    double tMin = cr[i].beatLength - ((kMaxSecsPhaseError * sr) / nb);
+    double tMax = cr[i].beatLength + ((kMaxSecsPhaseError * sr) / nb);
+    if (longestBeatLen > tMin && longestBeatLen < tMax) {
+      double newLen = cr[midRegion + 1].firstBeat - cr[i].firstBeat;
+      double blMin = std::max(lenMin, tMin), blMax = std::min(lenMax, tMax);
+      int maxNb = (int)round(newLen / blMin), minNb = (int)round(newLen / blMax);
+      if (minNb != maxNb) continue;
+      double newBeatLen = newLen / minNb;
+      if (newBeatLen > lenMin && newBeatLen < lenMax) {
+        longestLen = newLen; longestBeatLen = newBeatLen; longestNumBeats = minNb;
+        lenMin = longestBeatLen - ((kMaxSecsPhaseError * sr) / longestNumBeats);
+        lenMax = longestBeatLen + ((kMaxSecsPhaseError * sr) / longestNumBeats);
+        startRegion = i;
+        break;
+      }
+    }
+  }
+  /* extend toward the end */
+  for (int i = (int)cr.size() - 2; i > midRegion; --i) {
+    double len = cr[i + 1].firstBeat - cr[i].firstBeat;
+    int nb = (int)((len / cr[i].beatLength) + 0.5);
+    if (nb < kMinRegionBeatCount) continue;
+    double tMin = cr[i].beatLength - ((kMaxSecsPhaseError * sr) / nb);
+    double tMax = cr[i].beatLength + ((kMaxSecsPhaseError * sr) / nb);
+    if (longestBeatLen > tMin && longestBeatLen < tMax) {
+      double newLen = cr[i + 1].firstBeat - cr[startRegion].firstBeat;
+      double blMin = std::max(lenMin, tMin), blMax = std::min(lenMax, tMax);
+      int maxNb = (int)round(newLen / blMin), minNb = (int)round(newLen / blMax);
+      if (minNb != maxNb) continue;
+      double newBeatLen = newLen / minNb;
+      if (newBeatLen > lenMin && newBeatLen < lenMax) {
+        longestLen = newLen; longestBeatLen = newBeatLen; longestNumBeats = minNb;
+        break;
+      }
+    }
+  }
+  lenMin = longestBeatLen - ((kMaxSecsPhaseError * sr) / longestNumBeats);
+  lenMax = longestBeatLen + ((kMaxSecsPhaseError * sr) / longestNumBeats);
+  double minBpm = 60.0 * sr / lenMax;
+  double maxBpm = 60.0 * sr / lenMin;
+  double centerBpm = 60.0 * sr / longestBeatLen;
+  return bu_roundBpmWithinRange(minBpm, centerBpm, maxBpm);
+}
+
+/* BeatUtils::calculateBpm entry. cb = beat positions in frames. */
+double bu_calculateBpm(const std::vector<double>& cb, double sr) {
+  if (cb.size() < 2) return 0;
+  if ((int)cb.size() < kMinRegionBeatCount) {
+    /* calculateAverageBpm fallback */
+    return 60.0 * (cb.size() - 1) * sr / (cb.back() - cb.front());
+  }
+  return bu_makeConstBpm(bu_retrieveConstRegions(cb, sr), sr);
+}
+} /* anonymous namespace */
+
+extern "C" {
+
 /*
  * Run BOTH analyses over planar mono-able stereo.
  *   src_l/src_r : channels (length frames). Mono: src_r == src_l.
@@ -121,21 +272,14 @@ void qm_analyze(const float* src_l, const float* src_r, int frames, int sample_r
 
   if (g_beat_frames.size() >= 2) {
     g_first_beat_frame = g_beat_frames[0];
-    /* median inter-beat interval → BPM (robust to outliers) */
-    std::vector<double> ibi;
-    for (size_t i = 1; i < g_beat_frames.size(); i++) {
-      ibi.push_back((double)(g_beat_frames[i] - g_beat_frames[i - 1]));
-    }
-    std::sort(ibi.begin(), ibi.end());
-    double medIbi = ibi[ibi.size() / 2];
-    double rawBpm = medIbi > 0 ? (60.0 * sr / medIbi) : 0.0;
-    /* Octave-fold into a standard DJ range. TempoTrackV2's Rayleigh weighting centers
-     * near 120, so slow tracks can come back tracked at 2× (eighth-notes). Fold by
-     * ×½ / ×2 into [76, 152) — the common single-octave window DJ software uses. */
-    while (rawBpm >= 152.0) rawBpm /= 2.0;
-    while (rawBpm > 0.0 && rawBpm < 76.0) rawBpm *= 2.0;
-    g_bpm = floor(rawBpm * 100.0 + 0.5) / 100.0;
+    /* BPM via Mixxx's BeatUtils::calculateBpm (constant-region detection + musical
+     * rounding) — identical to Mixxx, no naive median-IBI octave errors. */
+    std::vector<double> beatFramesD(g_beat_frames.begin(), g_beat_frames.end());
+    g_bpm = floor(bu_calculateBpm(beatFramesD, sr) * 100.0 + 0.5) / 100.0;
     /* confidence: consistency of inter-beat intervals (1 = perfectly steady) */
+    std::vector<double> ibi;
+    for (size_t i = 1; i < g_beat_frames.size(); i++)
+      ibi.push_back((double)(g_beat_frames[i] - g_beat_frames[i - 1]));
     double mean = 0; for (double v : ibi) mean += v; mean /= ibi.size();
     double var = 0; for (double v : ibi) { double d = v - mean; var += d * d; }
     var /= ibi.size();
