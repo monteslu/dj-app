@@ -15,7 +15,13 @@ const BUSES: Array<{ id: BusType; label: string; hint: string }> = [
   { id: 'booth', label: 'Booth', hint: 'booth monitor (own gain)' },
 ];
 
-export function AudioSettings({ onClose }: { onClose: () => void }): React.JSX.Element {
+export function AudioSettings({
+  onClose,
+  embedded = false,
+}: {
+  onClose?: () => void;
+  embedded?: boolean;
+}): React.JSX.Element {
   const { engine, started, start } = useDj();
   const [devices, setDevices] = useState<OutputDevice[]>([]);
   const [assignments, setAssignments] = useState<Record<string, string>>({});
@@ -59,15 +65,16 @@ export function AudioSettings({ onClose }: { onClose: () => void }): React.JSX.E
     [engine],
   );
 
-  return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal audio-settings" onClick={(e) => e.stopPropagation()}>
-        <header className="modal-header">
-          <h2>Audio Output Routing</h2>
-          <button className="tiny" onClick={onClose}>
-            ✕
-          </button>
-        </header>
+  const body = (
+    <>
+        {!embedded && (
+          <header className="modal-header">
+            <h2>Audio Output Routing</h2>
+            <button className="tiny" onClick={onClose}>
+              ✕
+            </button>
+          </header>
+        )}
         <p className="modal-note">
           Send each bus to a different sound card — e.g. Master to the PA, Headphones to a USB
           interface for cueing. One engine clock, Mixxx-style.
@@ -96,6 +103,16 @@ export function AudioSettings({ onClose }: { onClose: () => void }): React.JSX.E
         <button className="tiny" onClick={() => void refresh()}>
           ↻ rescan devices
         </button>
+    </>
+  );
+
+  if (embedded) {
+    return <div className="audio-settings embedded">{body}</div>;
+  }
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal audio-settings" onClick={(e) => e.stopPropagation()}>
+        {body}
       </div>
     </div>
   );

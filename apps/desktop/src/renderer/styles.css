@@ -1450,6 +1450,123 @@ input[type='range'].vfader::-webkit-slider-thumb {
   margin: 8px 0 18px;
   line-height: 1.5;
 }
+
+/* Preferences (tabbed, Mixxx/rekordbox style) */
+.modal.preferences {
+  min-width: 720px;
+  width: 760px;
+  padding: 0;
+  overflow: hidden;
+}
+.modal.preferences .modal-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--edge-bright);
+}
+.prefs-body {
+  display: flex;
+  min-height: 420px;
+}
+.prefs-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 180px;
+  padding: 12px 8px;
+  border-right: 1px solid var(--edge-bright);
+  background: rgba(0, 0, 0, 0.2);
+}
+.prefs-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.prefs-tab:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+}
+.prefs-tab.active {
+  background: var(--accent);
+  color: #06090e;
+  font-weight: 600;
+}
+.prefs-tab-icon {
+  font-size: 15px;
+}
+.prefs-content {
+  flex: 1;
+  padding: 20px 24px;
+  overflow-y: auto;
+  max-height: 70vh;
+}
+.prefs-panel h3 {
+  margin: 0 0 14px;
+  font-size: 14px;
+  color: var(--accent);
+}
+.prefs-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 10px 0;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+.prefs-row input[type='checkbox'],
+.prefs-row input[type='radio'] {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+.prefs-row small {
+  display: block;
+  color: var(--text-dim);
+  font-size: 11px;
+  line-height: 1.45;
+  margin-top: 2px;
+}
+.prefs-row em {
+  color: var(--accent);
+  font-style: normal;
+  font-size: 11px;
+}
+.prefs-radio {
+  border: 1px solid var(--edge-bright);
+  border-radius: 8px;
+  padding: 10px 14px 14px;
+  margin: 16px 0;
+}
+.prefs-radio legend {
+  font-size: 12px;
+  color: var(--text-dim);
+  padding: 0 6px;
+}
+.prefs-note {
+  font-size: 11px;
+  color: var(--text-dim);
+  line-height: 1.5;
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 1px solid var(--edge);
+}
+.prefs-zoom-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+.audio-settings.embedded,
+.controller-settings.embedded {
+  padding: 0;
+}
 .bus-routes {
   display: flex;
   flex-direction: column;

@@ -212,12 +212,18 @@ class EngineProcessor extends AudioWorkletProcessor {
       slot.lastScratching = scratching;
       if (idx.syncEnabled !== undefined) slot.lastSyncEnabled = sabRead(control, idx.syncEnabled) > 0.5;
 
-      // Quantize-to-own-grid on platter release (independent of sync): snap this deck
-      // to its nearest beat so hand jitter lands on the grid, WITHOUT touching the
-      // other deck. Only when quantize is enabled for the deck.
+      // Platter-release behavior is configurable (platterReleaseMode):
+      //   0 = stay where the hand left it (no snap)
+      //   1 = quantize to THIS deck's own nearest beat (default; preserves manual
+      //       measure alignment, ≤¼ beat, never jarring) — done here, independent of sync
+      //   2 = re-sync phase to the leader deck (route through the sync path below)
       if (quantizeTrigger) {
-        const qOn = idx.quantize !== undefined && sabRead(control, idx.quantize) > 0.5;
-        if (qOn && idx.fileBpm !== undefined && sabRead(control, idx.fileBpm) > 0) {
+        const mode = idx.platterReleaseMode !== undefined ? sabRead(control, idx.platterReleaseMode) : 1;
+        if (mode >= 1.5) {
+          // mode 2: behave like a sync snap (align to leader)
+          syncTrigger = true;
+        } else if (mode >= 0.5 && idx.fileBpm !== undefined && sabRead(control, idx.fileBpm) > 0) {
+          // mode 1: quantize to own grid
           const g = makeGrid(
             sabRead(control, idx.fileBpm),
             idx.firstBeatFrame !== undefined ? Math.max(0, sabRead(control, idx.firstBeatFrame)) : 0,
@@ -230,6 +236,7 @@ class EngineProcessor extends AudioWorkletProcessor {
             sabWrite(control, idx.playPosition, slot.playback.getPositionFraction());
           }
         }
+        // mode 0: nothing — stay where the hand left it
       }
 
       if (!syncTrigger) continue;

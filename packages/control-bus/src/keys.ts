@@ -116,6 +116,10 @@ export const DeckKeys = {
 
   beatDistance: 'beat_distance', // 0..1, live distance to the previous beat (published by engine)
   quantize: 'quantize', // 1 = snap cue/loop/play drops to the nearest beat
+  // Platter-release behavior: 0 = stay where the hand left it, 1 = quantize to this
+  // deck's own nearest beat (default, preserves manual measure alignment), 2 = re-sync
+  // phase to the leader deck.
+  platterReleaseMode: 'platter_release_mode',
 
   // mixer (per channel)
   volume: 'volume', // 0..1

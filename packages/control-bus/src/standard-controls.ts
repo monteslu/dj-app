@@ -60,6 +60,13 @@ function deckControls(g: string): ControlDef[] {
     { group: g, key: DeckKeys.syncRequest, default: 0, description: 'Pulse: request a worklet phase-snap now' },
     { group: g, key: DeckKeys.beatDistance, default: 0, description: 'Live beat distance 0..1' },
     { group: g, key: DeckKeys.quantize, default: 1, persist: true, description: 'Quantize to beat grid' },
+    {
+      group: g,
+      key: DeckKeys.platterReleaseMode,
+      default: 1,
+      persist: true,
+      description: 'Platter release: 0=stay, 1=quantize own beat, 2=resync leader',
+    },
 
     // mixer
     { group: g, key: DeckKeys.volume, default: 1, description: 'Channel volume 0..1' },

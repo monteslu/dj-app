@@ -26,6 +26,7 @@ export interface DeckControlIndices {
   scratching: number;
   scratchRate: number;
   quantize: number;
+  platterReleaseMode: number;
   keylock: number;
   pregain: number;
   volume: number;

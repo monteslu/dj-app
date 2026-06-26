@@ -20,7 +20,13 @@ const MAPPINGS: Mapping[] = [
   { id: 'generic', name: 'Generic MIDI (built-in)', xml: GENERIC_MIDI_XML, js: GENERIC_MIDI_JS },
 ];
 
-export function ControllerSettings({ onClose }: { onClose: () => void }): React.JSX.Element {
+export function ControllerSettings({
+  onClose,
+  embedded = false,
+}: {
+  onClose?: () => void;
+  embedded?: boolean;
+}): React.JSX.Element {
   const { controllers } = useDj();
   const [inputs, setInputs] = useState<string[]>([]);
   const [device, setDevice] = useState<string>('');
@@ -60,15 +66,16 @@ export function ControllerSettings({ onClose }: { onClose: () => void }): React.
     }
   };
 
-  return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>🎛 MIDI Controllers</h2>
-          <button className="tiny" onClick={onClose}>
-            ✕
-          </button>
-        </div>
+  const body = (
+    <>
+        {!embedded && (
+          <div className="modal-header">
+            <h2>🎛 MIDI Controllers</h2>
+            <button className="tiny" onClick={onClose}>
+              ✕
+            </button>
+          </div>
+        )}
         <p className="modal-note">
           Pick a MIDI device and a mapping. Mappings use Mixxx&apos;s <code>.midi.xml</code> format
           and run the original controller JS, so jog-wheel scratch and all controls drive the deck.
@@ -112,6 +119,16 @@ export function ControllerSettings({ onClose }: { onClose: () => void }): React.
           </button>
           {status && <span className="bus-hint">{status}</span>}
         </div>
+    </>
+  );
+
+  if (embedded) {
+    return <div className="controller-settings embedded">{body}</div>;
+  }
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        {body}
       </div>
     </div>
   );
