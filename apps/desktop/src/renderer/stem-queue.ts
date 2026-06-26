@@ -24,6 +24,9 @@ export interface StemStatus {
   phase: GenerateProgress['phase'] | null;
   /** How many jobs remain (including current). */
   remaining: number;
+  /** Track ids WAITING in the queue (not the one currently generating) — so a row can
+   *  tell if IT specifically is queued, vs. just "something is queued". */
+  queued: Set<number>;
   /** Track ids whose stems completed this session (rows refresh to "stems ✓"). */
   done: Set<number>;
   /** Track ids that failed (so the row can show an error + allow retry). */
@@ -41,6 +44,7 @@ export class StemQueue {
     progress: 0,
     phase: null,
     remaining: 0,
+    queued: new Set(),
     done: new Set(),
     failed: new Set(),
   };
@@ -60,6 +64,7 @@ export class StemQueue {
   private emit(): void {
     this.status = {
       ...this.status,
+      queued: new Set(this.queue), // the actual waiting ids
       done: new Set(this.status.done),
       failed: new Set(this.status.failed),
     };

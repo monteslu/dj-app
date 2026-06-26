@@ -1144,6 +1144,16 @@ input[type='range'].xfader-slider::-webkit-slider-thumb {
   font-size: 11px;
   color: var(--accent);
 }
+.library-stemming {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #5dff9e; /* stem green (matches the 'OTHER' stem + stem accent) */
+}
+.library-stemming .spin {
+  border-top-color: #5dff9e;
+}
 
 /* tiny spinner (background analysis indicator) */
 .spin {

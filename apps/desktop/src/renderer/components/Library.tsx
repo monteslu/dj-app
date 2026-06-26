@@ -246,6 +246,11 @@ export function Library(): React.JSX.Element {
             <span className="spin" /> analyzing {analysisStatus.remaining} left
           </span>
         )}
+        {stemStatus.remaining > 0 && (
+          <span className="library-stemming" title="Generating stems in the background">
+            <span className="spin" /> stems processing {stemStatus.remaining} left
+          </span>
+        )}
         {dbError && <span className="library-error">{dbError}</span>}
       </div>
 
@@ -356,7 +361,8 @@ function StemCell({
 }): React.JSX.Element {
   const hasStems = !!track.stemPath || track.stemsGeneratedAt > 0 || status.done.has(track.id);
   const generating = status.current === track.id;
-  const queued = !generating && status.remaining > 0 && !hasStems && !status.failed.has(track.id);
+  // queued = THIS track is waiting in the queue (not just "something is queued").
+  const queued = status.queued.has(track.id);
 
   if (generating) {
     const pct = Math.round(status.progress * 100);
