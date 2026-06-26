@@ -7,8 +7,7 @@
 
 import { fromAudioBuffer } from '@dj/codec';
 import { computePeakSet, detailBucketsForDuration } from '@dj/waveform';
-import { detectKey } from '@dj/analysis';
-import { WasmBeatDetector } from '@dj/dsp-wasm';
+import { WasmQmAnalysis } from '@dj/dsp-wasm';
 import { SyncController, makeGrid, beatDistance } from '@dj/audio-engine';
 import { ControlBus, standardControls, deck as deckGroup, DeckKeys } from '@dj/control-bus';
 
@@ -51,14 +50,11 @@ async function run(): Promise<void> {
     const nonZero = [...peaks.overview.peaks].some((p) => p > 0);
     steps.push(`peaks: detail=${peaks.detail.length} overview=${peaks.overview.length} nonZero=${nonZero}`);
 
-    // 5. WASM beat detection
-    const det = new WasmBeatDetector();
-    const beat = det.detect(channels, track.frames, track.sampleRate);
-    steps.push(`BPM: ${beat.bpm} firstBeat=${beat.firstBeatFrame} conf=${beat.confidence.toFixed(2)}`);
-
-    // 6. key detection
-    const key = detectKey(channels, track.frames, track.sampleRate);
-    steps.push(`key: ${key.name} (${key.camelot})`);
+    // 5-6. WASM analysis (Mixxx qm-dsp): key + beat + downbeats in one pass
+    const qm = new WasmQmAnalysis();
+    const a = qm.analyze(channels, track.frames, track.sampleRate);
+    steps.push(`BPM: ${a.bpm} firstBeat=${a.firstBeatFrame} conf=${a.confidence.toFixed(2)}`);
+    steps.push(`key: ${a.key} (${a.camelot}) · beats=${a.beatFrames.length} downbeats=${a.downbeatFrames.length}`);
 
     // 7. beat-sync integration (real ControlBus + SyncController, no device)
     const bus = new ControlBus();
@@ -92,8 +88,8 @@ async function run(): Promise<void> {
     steps.push(`sync: snapped=${seeks.includes(1)} follPhase=${followerPhase.toFixed(3)} leadPhase=${leaderPhase.toFixed(3)} locked=${phaseLocked}`);
 
     result.ok = true;
-    result.bpm = beat.bpm;
-    result.key = key.camelot;
+    result.bpm = a.bpm;
+    result.key = a.camelot;
     result.peaksNonZero = nonZero;
     result.syncPhaseLocked = phaseLocked;
   } catch (e) {

@@ -6,15 +6,16 @@
 
 /// <reference lib="webworker" />
 
-import { WasmBeatDetector, WasmPeaks } from '@dj/dsp-wasm';
+import { WasmQmAnalysis, WasmPeaks } from '@dj/dsp-wasm';
 import { detailBucketsForDuration, OVERVIEW_BUCKETS } from '@dj/waveform';
-import { detectKey } from './key-detector.js';
 import type { AnalyzeRequest, AnalyzeResponse } from './worker-protocol.js';
 
 declare const self: DedicatedWorkerGlobalScope;
 
-// One instance per worker (the WASM modules are reused across tracks).
-const detector = new WasmBeatDetector();
+// One instance per worker (the WASM modules are reused across tracks). qm = Mixxx's
+// actual Queen Mary DSP: key (GetKeyMode) + beat (TempoTrackV2) + downbeats (DownBeat)
+// + BPM (BeatUtils::calculateBpm), all in one pass.
+const qm = new WasmQmAnalysis();
 const peaksWasm = new WasmPeaks();
 
 self.onmessage = (e: MessageEvent<AnalyzeRequest>) => {
@@ -27,16 +28,16 @@ self.onmessage = (e: MessageEvent<AnalyzeRequest>) => {
   for (let c = 0; c < msg.channels; c++) {
     channels.push(all.subarray(c * msg.frames, (c + 1) * msg.frames));
   }
-  const r = detector.detect(channels, msg.frames, msg.sampleRate);
-  const k = detectKey(channels, msg.frames, msg.sampleRate);
+  const r = qm.analyze(channels, msg.frames, msg.sampleRate);
   const res: AnalyzeResponse = {
     type: 'analyzed',
     id: msg.id,
     bpm: r.bpm,
     firstBeatFrame: r.firstBeatFrame,
     confidence: r.confidence,
-    key: k.name,
-    camelot: k.camelot,
+    key: r.key,
+    camelot: r.camelot,
+    downbeatFrames: r.downbeatFrames,
   };
 
   // Compute the waveform peaks here too (off the main thread) when asked, so the

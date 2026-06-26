@@ -41,20 +41,6 @@ const modules = [
     growMemory: true,
   },
   {
-    name: 'beatdetect',
-    src: 'beatdetect.c',
-    exports: [
-      '_beatdetect_run',
-      '_beatdetect_bpm',
-      '_beatdetect_first_beat_frame',
-      '_beatdetect_confidence',
-      '_bd_malloc',
-      '_bd_free',
-    ],
-    // A full track's stereo float source can be large; allow the heap to grow.
-    growMemory: true,
-  },
-  {
     name: 'peaks',
     src: 'peaks.c',
     // Faithful Mixxx AnalyzerWaveform: Bessel-4 band split via FIDLIB + per-stride

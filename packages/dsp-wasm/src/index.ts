@@ -7,10 +7,5 @@ export {
   type PullParams,
   type PullOutcome,
 } from './resampler.js';
-export {
-  WasmBeatDetector,
-  type BeatResult,
-  type BeatDetectOptions,
-} from './beatdetect.js';
 export { WasmPeaks, type BandPeaks, type PeakSet } from './peaks.js';
 export { WasmQmAnalysis, type QmResult } from './qmanalysis.js';
