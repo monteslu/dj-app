@@ -26,6 +26,7 @@ import { startPerfMonitor } from './perf-monitor.js';
 import { onFrame } from './frame-loop.js';
 import { ControllerService } from './controller-service.js';
 import { RecordingService } from './recording-service.js';
+import { OutputEmitter } from './output-emitter.js';
 import { loadTrackToDeck } from './track-loader.js';
 
 export const NUM_DECKS = 2;
@@ -42,6 +43,7 @@ export interface DjRuntime {
   stemThumbnails: StemThumbnailBackfill;
   controllers: ControllerService;
   recording: RecordingService;
+  outputEmitter: OutputEmitter;
   /** True once the AudioContext has been started (needs a user gesture). */
   started: boolean;
   start: () => Promise<void>;
@@ -58,6 +60,7 @@ function buildRuntime(): {
   stemThumbnails: StemThumbnailBackfill;
   controllers: ControllerService;
   recording: RecordingService;
+  outputEmitter: OutputEmitter;
 } {
   // Persist `persist:true` controls (keylock, smart fader, crossfader curve, etc.)
   // to localStorage so they survive restarts.
@@ -94,7 +97,18 @@ function buildRuntime(): {
   const stemThumbnails = new StemThumbnailBackfill(engine);
   const controllers = new ControllerService(bus);
   const recording = new RecordingService(engine);
-  const runtime = { bus, engine, analysis, analysisQueue, stemQueue, stemThumbnails, controllers, recording };
+  const outputEmitter = new OutputEmitter(engine, bus, NUM_DECKS);
+  const runtime = {
+    bus,
+    engine,
+    analysis,
+    analysisQueue,
+    stemQueue,
+    stemThumbnails,
+    controllers,
+    recording,
+    outputEmitter,
+  };
   // Expose the runtime for e2e/debugging (drive sync, read positions, inspect the
   // bus from the page). Harmless in prod; invaluable for the Playwright loop. The
   // loadToDeck helper uses the REAL load pipeline (decode → peaks → engine), so
@@ -177,6 +191,7 @@ export function DjProvider({ children }: { children: ReactNode }): React.JSX.Ele
       runtime.stemQueue.dispose();
       runtime.stemThumbnails.dispose();
       runtime.controllers.dispose();
+      runtime.outputEmitter.dispose();
     };
   }, [runtime]);
 
@@ -191,6 +206,7 @@ export function DjProvider({ children }: { children: ReactNode }): React.JSX.Ele
         stemThumbnails: runtime.stemThumbnails,
         controllers: runtime.controllers,
         recording: runtime.recording,
+        outputEmitter: runtime.outputEmitter,
         started,
         start,
       }}

@@ -23,6 +23,7 @@
     "@dj/codec": "*",
     "@dj/control-bus": "*",
     "@dj/db": "*",
+    "@dj/output-bus": "*",
     "@dj/stem-mp4": "*",
     "@dj/stems": "*",
     "@dj/waveform": "*",
