@@ -9,6 +9,7 @@
     { "path": "./packages/controller-host" },
     { "path": "./packages/dsp-wasm" },
     { "path": "./packages/db" },
+    { "path": "./packages/stem-mp4" },
     { "path": "./apps/desktop" }
   ]
 }

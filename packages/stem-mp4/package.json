@@ -1,0 +1,16 @@
+{
+  "name": "@dj/stem-mp4",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Read/write NI-Stems .stem.mp4 (mixdown + 4 stem audio tracks). Vendored pure-JS muxer from the stem-mp4 package; browser+Node safe. Enables in-app stem generation and stem-deck playback.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "test": "vitest run"
+  }
+}

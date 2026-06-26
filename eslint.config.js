@@ -10,6 +10,7 @@ export default tseslint.config(
       '**/out/**',
       '**/node_modules/**',
       'vendor/**',
+      '**/src/vendor/**',
       '**/*.tsbuildinfo',
       // Generated WASM base64 blobs — not source, don't lint.
       '**/src/generated/**',
