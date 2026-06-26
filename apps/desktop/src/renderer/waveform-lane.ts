@@ -12,6 +12,22 @@ import { reportLaneDraw } from './perf-monitor.js';
 import { onFrame } from './frame-loop.js';
 
 const SR = 48000;
+
+// Per-stem waveform colors + their gain keys (NI-Stems order: drums/bass/other/
+// vocals). Must match the StemRow mixer colors so fader ↔ wave map by eye.
+const STEM_WAVE_COLORS: Array<[number, number, number]> = [
+  [255, 93, 93], // drums
+  [255, 210, 77], // bass
+  [93, 255, 158], // other
+  [93, 184, 255], // vocals
+];
+const STEM_GAIN_KEYS = [
+  DeckKeys.stemGain0,
+  DeckKeys.stemGain1,
+  DeckKeys.stemGain2,
+  DeckKeys.stemGain3,
+];
+
 // FIXED zoom presets: source frames per screen pixel. Like Mixxx, the waveform's
 // sample→pixel scale is a CONSTANT (never derived from BPM — that caused the
 // every-frame rescale/shimmer). A few discrete levels the user cycles through;
@@ -111,10 +127,22 @@ export class WaveformLaneController {
       this.smoothFrames = advanced + (publishedFrames - advanced) * 0.1; // converge
     }
     const positionFrames = this.smoothFrames;
+    // Stem deck: color each stem, dimming by its live gain (from the stem mixer), so
+    // the wave reflects the current mash (muted stem fades out).
+    const stemBands =
+      st.stemPeaks && st.stemPeaks.length === STEM_WAVE_COLORS.length
+        ? st.stemPeaks.map((p, i) => ({
+            peaks: p.peaks,
+            rgb: STEM_WAVE_COLORS[i]!,
+            gain: this.bus.get(g, STEM_GAIN_KEYS[i]!),
+          }))
+        : undefined;
+
     const t0 = performance.now();
     drawScrolling(this.canvas, st.peaks.detail, positionFrames, framesPerPx, DEFAULT_COLORS, {
       firstBeatFrame: fbf >= 0 ? fbf : 0,
       framesPerBeat,
+      stems: stemBands,
     });
     reportLaneDraw(`deck${this.deckIndex}`, false, performance.now() - t0);
   };

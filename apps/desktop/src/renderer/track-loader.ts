@@ -83,6 +83,7 @@ export async function loadTrackToDeck(
   const title = m.title ?? src.file.name.replace(/\.[^.]+$/, '');
   setDeckTrack(deckIndex, {
     peaks,
+    stemPeaks: null, // a normal track clears any prior stem-deck coloring
     title,
     artist: m.artist ?? null,
     album: m.album ?? null,
@@ -171,11 +172,21 @@ async function loadStemFile(
       ch.push(all.subarray(c * mixDecoded.frames, (c + 1) * mixDecoded.frames));
     }
     const dur = mixDecoded.frames / mixDecoded.sampleRate;
-    const peaks = computePeakSet(ch, mixDecoded.frames, detailBucketsForDuration(dur), mixDecoded.sampleRate);
+    const detailBuckets = detailBucketsForDuration(dur);
+    const peaks = computePeakSet(ch, mixDecoded.frames, detailBuckets, mixDecoded.sampleRate);
+
+    // Per-stem detail peaks so the waveform colors each stem (the mashup view).
+    const stemPeaks = stems.map((s) => {
+      const sAll = new Float32Array(s.sampleBuffer);
+      const sCh: Float32Array[] = [];
+      for (let c = 0; c < s.channels; c++) sCh.push(sAll.subarray(c * s.frames, (c + 1) * s.frames));
+      return computePeakSet(sCh, s.frames, detailBuckets, s.sampleRate).detail;
+    });
 
     const m = src.meta ?? {};
     setDeckTrack(deckIndex, {
       peaks,
+      stemPeaks,
       title: m.title ?? src.file.name.replace(/\.[^.]+$/, ''),
       artist: m.artist ?? null,
       album: m.album ?? null,

@@ -10,6 +10,9 @@ import type { PeakData } from '@dj/waveform';
 
 export interface DeckTrackState {
   peaks: { detail: PeakData; overview: PeakData } | null;
+  /** Per-stem detail peaks (drums/bass/other/vocals) when this is a stem deck — the
+   *  waveform colors each stem. Same bucketing as `peaks.detail`. null = not stems. */
+  stemPeaks: PeakData[] | null;
   title: string | null;
   artist: string | null;
   album: string | null;
@@ -21,6 +24,7 @@ export interface DeckTrackState {
 
 const empty: DeckTrackState = {
   peaks: null,
+  stemPeaks: null,
   title: null,
   artist: null,
   album: null,

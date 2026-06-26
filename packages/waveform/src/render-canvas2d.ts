@@ -206,10 +206,23 @@ function buildPalette(played: boolean): string[] {
 const PALETTE_LIVE = /* @__PURE__ */ buildPalette(false);
 const PALETTE_PLAYED = /* @__PURE__ */ buildPalette(true);
 
+/** One stem's per-bucket amplitude + display color, for stem-colored waveforms. */
+export interface StemBand {
+  /** Per-bucket max-abs amplitude 0..255 (same bucketing as the detail peaks). */
+  peaks: Uint8Array;
+  /** Display color [r,g,b] 0..255. */
+  rgb: [number, number, number];
+  /** 0..1 live gain (from the stem mixer) — dims/hides a muted stem's wave. */
+  gain?: number;
+}
+
 export interface ScrollOverlay {
   /** Beat grid: frame of the first beat + frames per beat (0 = no grid). */
   firstBeatFrame?: number;
   framesPerBeat?: number;
+  /** When present, draw the waveform as overlaid color-per-stem bands (mashup view)
+   *  instead of the 3-band RGB. Order: drums, bass, other, vocals. */
+  stems?: StemBand[];
 }
 
 export function drawScrolling(
@@ -280,30 +293,59 @@ export function drawScrolling(
   const snapPx = Math.round(posPx);
   const subPx = posPx - snapPx; // -0.5..0.5
   const bands = detail.low && detail.mid && detail.high;
+  const stems = overlay?.stems;
 
   // offscreen is 2px wider so the sub-pixel slide never reveals an edge gap
   const off = getBarsCanvas(w + 2, h);
   const octx = off.getContext('2d') as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
   octx.clearRect(0, 0, w + 2, h);
-  // offscreen column ox corresponds to lane x = ox - 1 (1px left margin)
-  for (let ox = 0; ox < w + 2; ox++) {
-    const x = ox - 1;
-    const b = snapPx + (x - centerX); // integer bucket-column (snapped → frozen)
-    const frame = b * framesPerPx;
-    if (frame < 0) continue;
-    const bi = Math.floor(frame / framesPerBucket);
-    if (bi >= length) break;
-    const v = peaks[bi]!;
-    const amp = (v / 255) * mid * 0.92;
-    if (amp <= 0) continue;
-    const played = x < centerX;
-    if (bands) {
-      octx.fillStyle = bandColorCss(detail.low![bi]!, detail.mid![bi]!, detail.high![bi]!, played);
-    } else {
-      const bucket = ((v / 255) * (PALETTE_N - 1)) | 0;
-      octx.fillStyle = played ? PALETTE_PLAYED[bucket]! : PALETTE_LIVE[bucket]!;
+
+  if (stems && stems.length > 0) {
+    // STEM MODE: overlay each stem in its own color (Mixxx waveformrendererstem).
+    // Additive blend so overlapping stems mix and the tallest signal shows through;
+    // a muted stem (gain ~0) fades out so the wave reflects the live mix.
+    octx.globalCompositeOperation = 'lighter';
+    for (const stem of stems) {
+      const g = stem.gain ?? 1;
+      if (g <= 0.001) continue; // muted → not drawn
+      const [r, gg, bl] = stem.rgb;
+      const a = 0.55 * Math.min(1, g + 0.15); // gain dims the band
+      octx.fillStyle = `rgba(${r},${gg},${bl},${a})`;
+      const sp = stem.peaks;
+      for (let ox = 0; ox < w + 2; ox++) {
+        const x = ox - 1;
+        const b = snapPx + (x - centerX);
+        const frame = b * framesPerPx;
+        if (frame < 0) continue;
+        const bi = Math.floor(frame / framesPerBucket);
+        if (bi >= sp.length) break;
+        const amp = (sp[bi]! / 255) * mid * 0.92;
+        if (amp <= 0) continue;
+        octx.fillRect(ox, mid - amp, 1, amp * 2);
+      }
     }
-    octx.fillRect(ox, mid - amp, 1, amp * 2);
+    octx.globalCompositeOperation = 'source-over';
+  } else {
+    // offscreen column ox corresponds to lane x = ox - 1 (1px left margin)
+    for (let ox = 0; ox < w + 2; ox++) {
+      const x = ox - 1;
+      const b = snapPx + (x - centerX); // integer bucket-column (snapped → frozen)
+      const frame = b * framesPerPx;
+      if (frame < 0) continue;
+      const bi = Math.floor(frame / framesPerBucket);
+      if (bi >= length) break;
+      const v = peaks[bi]!;
+      const amp = (v / 255) * mid * 0.92;
+      if (amp <= 0) continue;
+      const played = x < centerX;
+      if (bands) {
+        octx.fillStyle = bandColorCss(detail.low![bi]!, detail.mid![bi]!, detail.high![bi]!, played);
+      } else {
+        const bucket = ((v / 255) * (PALETTE_N - 1)) | 0;
+        octx.fillStyle = played ? PALETTE_PLAYED[bucket]! : PALETTE_LIVE[bucket]!;
+      }
+      octx.fillRect(ox, mid - amp, 1, amp * 2);
+    }
   }
   // blit with the sub-pixel slide. drawImage at a fractional x = smooth translate.
   ctx.drawImage(off as CanvasImageSource, -1 - subPx, 0);

@@ -22,6 +22,7 @@ export {
   type LoopRegion,
   type Overlay,
   type ScrollOverlay,
+  type StemBand,
 } from './render-canvas2d.js';
 // GPU scrolling-waveform renderer (the live, per-frame path).
 export { WaveformGL, type ScrollGLParams } from './render-webgl.js';
