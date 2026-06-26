@@ -59,7 +59,7 @@ function deckControls(g: string): ControlDef[] {
     { group: g, key: DeckKeys.syncLeader, default: 0, description: 'Explicit sync leader' },
     { group: g, key: DeckKeys.syncRequest, default: 0, description: 'Pulse: request a worklet phase-snap now' },
     { group: g, key: DeckKeys.beatDistance, default: 0, description: 'Live beat distance 0..1' },
-    { group: g, key: DeckKeys.quantize, default: 0, persist: true, description: 'Quantize to beat grid' },
+    { group: g, key: DeckKeys.quantize, default: 1, persist: true, description: 'Quantize to beat grid' },
 
     // mixer
     { group: g, key: DeckKeys.volume, default: 1, description: 'Channel volume 0..1' },

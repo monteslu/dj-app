@@ -25,7 +25,7 @@ import { wrapSab, sabRead, sabWrite, type SabLayout } from '@dj/control-bus';
 import { DeckPlayback } from './deck-playback.js';
 import { calculateSpeed } from './rate.js';
 import { VuMeter } from './vu-meter.js';
-import { makeGrid, computeSnapTarget } from './sync/beatgrid.js';
+import { makeGrid, computeSnapTarget, nearestBeatFrame } from './sync/beatgrid.js';
 import type {
   DeckControlIndices,
   EngineMessage,
@@ -192,21 +192,47 @@ class EngineProcessor extends AudioWorkletProcessor {
       const playing = sabRead(control, idx.play) > 0.5;
       const scratching = idx.scratching !== undefined && sabRead(control, idx.scratching) > 0.5;
 
-      // Re-snap on the RIGHT moments (not at load): the deck starts/resumes playing,
-      // or a scratch ends — plus an explicit syncRequest pulse. NOT every buffer.
-      let trigger = false;
-      if (synced) {
-        if (playing && !slot.lastPlay) trigger = true; // play / resume
-        if (!scratching && slot.lastScratching) trigger = true; // scratch released
-      }
+      // Two DISTINCT snap behaviors, on different moments:
+      //  - syncTrigger  → align this deck's phase to the LEADER (play/resume edge, or
+      //    the SYNC button / smart-fade pulse). This is "lock to the other deck".
+      //  - quantizeTrigger → snap to THIS deck's OWN nearest beat after a platter
+      //    nudge (scratch release). This preserves the DJ's manual MEASURE alignment
+      //    (it never moves toward the leader, and ≤¼ beat so it's never jarring) —
+      //    the hold-platter-til-measures-line-up workflow. NOT downbeat (a full-bar
+      //    jump would be musically jarring); just tighten sub-beat hand wobble.
+      let syncTrigger = false;
+      let quantizeTrigger = false;
+      if (synced && playing && !slot.lastPlay) syncTrigger = true; // play / resume
+      if (!scratching && slot.lastScratching) quantizeTrigger = true; // platter released
       if (idx.syncRequest !== undefined && sabRead(control, idx.syncRequest) > 0.5) {
-        trigger = true;
+        syncTrigger = true;
         sabWrite(control, idx.syncRequest, 0); // consume the pulse
       }
       slot.lastPlay = playing;
       slot.lastScratching = scratching;
       if (idx.syncEnabled !== undefined) slot.lastSyncEnabled = sabRead(control, idx.syncEnabled) > 0.5;
-      if (!trigger) continue;
+
+      // Quantize-to-own-grid on platter release (independent of sync): snap this deck
+      // to its nearest beat so hand jitter lands on the grid, WITHOUT touching the
+      // other deck. Only when quantize is enabled for the deck.
+      if (quantizeTrigger) {
+        const qOn = idx.quantize !== undefined && sabRead(control, idx.quantize) > 0.5;
+        if (qOn && idx.fileBpm !== undefined && sabRead(control, idx.fileBpm) > 0) {
+          const g = makeGrid(
+            sabRead(control, idx.fileBpm),
+            idx.firstBeatFrame !== undefined ? Math.max(0, sabRead(control, idx.firstBeatFrame)) : 0,
+            sampleRate,
+          );
+          if (g) {
+            const pos = slot.playback.getPositionFrames();
+            const nearest = nearestBeatFrame(g, pos);
+            slot.playback.seekFrames(nearest);
+            sabWrite(control, idx.playPosition, slot.playback.getPositionFraction());
+          }
+        }
+      }
+
+      if (!syncTrigger) continue;
 
       // find a leader: another deck with a bpm that is actually PLAYING — snapping to
       // a paused leader gives a garbage phase (the bug: aligned to pos 0 pre-grid).

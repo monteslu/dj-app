@@ -195,6 +195,7 @@ export class Engine {
       rateRatioOverride: r(DeckKeys.rateRatioOverride),
       scratching: r(DeckKeys.scratching),
       scratchRate: r(DeckKeys.scratchRate),
+      quantize: r(DeckKeys.quantize),
       keylock: r(DeckKeys.keylock),
       pregain: r(DeckKeys.pregain),
       volume: r(DeckKeys.volume),
