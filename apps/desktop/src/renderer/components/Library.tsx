@@ -135,10 +135,20 @@ export function Library(): React.JSX.Element {
         'waveforms for every track (with the current analyzer) in the background.',
     );
     if (!ok) return;
+    // Analysis decodes audio → it NEEDS the AudioContext started, else every track
+    // fails instantly ("ran in seconds, nothing happened"). Start it first.
+    if (!started) {
+      try {
+        await start();
+      } catch {
+        window.alert('Could not start audio — press ▶ start audio, then try again.');
+        return;
+      }
+    }
     const n = await analysisQueue.reanalyzeAll();
     setScanning(null);
     if (n > 0) await refresh();
-  }, [analysisQueue, refresh]);
+  }, [analysisQueue, refresh, started, start]);
 
   // Double-click target: first STOPPED deck (Mixxx behavior), else deck 1. Avoids
   // clobbering a deck that's currently playing out.

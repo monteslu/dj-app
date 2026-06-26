@@ -32,6 +32,9 @@ export class AnalysisQueue {
   private status: AnalysisStatus = { current: new Set(), remaining: 0, done: new Set() };
   private readonly listeners = new Set<Listener>();
   private stopped = false;
+  // Per-run counters so we can SEE whether analysis actually did work.
+  private okCount = 0;
+  private failCount = 0;
 
   constructor(
     private readonly engine: Engine,
@@ -91,14 +94,21 @@ export class AnalysisQueue {
     } catch {
       return 0; // DB not ready
     }
+    console.log(`[analyze] reanalyzeAll: DB reset analyzed_at=0 on ${count} tracks`);
     this.status.done.clear();
     // libraryUnanalyzed caps at 1000; pull pages until the DB is drained.
+    let queued = 0;
     for (;;) {
       const ids = await window.dj.libraryUnanalyzed(1000);
       const fresh = ids.filter((id) => !this.inFlight.has(id) && !this.queue.includes(id));
       if (fresh.length === 0) break;
       this.enqueue(fresh);
+      queued += fresh.length;
       if (ids.length < 1000) break;
+    }
+    console.log(`[analyze] reanalyzeAll: queued ${queued} tracks for analysis`);
+    if (queued === 0 && count > 0) {
+      console.warn('[analyze] reset tracks but queued 0 — libraryUnanalyzed returned nothing?');
     }
     return count;
   }
@@ -106,10 +116,15 @@ export class AnalysisQueue {
   private async run(): Promise<void> {
     if (this.running) return;
     this.running = true;
+    this.okCount = 0;
+    this.failCount = 0;
+    const startedAt = Date.now();
+    const total = this.queue.length;
     // Keep up to `concurrency` analyses in flight (the worker pool size), refilling
     // as each completes — so a library scan saturates the POOL but not all cores
     // (the pool itself reserves cores for the UI + audio threads).
     const concurrency = this.analysis.poolSize;
+    console.log(`[analyze] starting: ${total} tracks queued, pool size ${concurrency}`);
     try {
       const launch = (): Promise<void> | null => {
         if (this.stopped || this.queue.length === 0) return null;
@@ -117,8 +132,14 @@ export class AnalysisQueue {
         this.inFlight.add(id);
         this.emit();
         return this.analyzeOne(id)
-          .catch(() => {
-            /* bad file — still mark done so we don't loop */
+          .then(() => {
+            this.okCount++;
+          })
+          .catch((e) => {
+            // Surface the reason instead of silently marking done — this is how the
+            // "ran in seconds, nothing happened" failure stays visible.
+            this.failCount++;
+            console.warn(`[analyze] track ${id} FAILED:`, e instanceof Error ? e.message : e);
           })
           .finally(() => {
             this.inFlight.delete(id);
@@ -141,14 +162,25 @@ export class AnalysisQueue {
     } finally {
       this.running = false;
       this.emit();
+      const secs = ((Date.now() - startedAt) / 1000).toFixed(1);
+      console.log(
+        `[analyze] DONE: ${this.okCount} ok, ${this.failCount} failed of ${total} in ${secs}s` +
+          (this.failCount > 0 ? ' — check the FAILED lines above' : ''),
+      );
     }
   }
 
   private async analyzeOne(id: number): Promise<void> {
     const file = await window.dj.readTrackById(id);
-    if (!file) return;
+    if (!file) {
+      throw new Error(`track ${id}: no file bytes (readTrackById returned null)`);
+    }
     const ctx = this.engine.audioContext;
-    if (!ctx) return; // engine not started yet; will retry next enqueue
+    if (!ctx) {
+      // Engine not started → we CANNOT analyze. Throw so the caller doesn't silently
+      // mark this "done" with nothing persisted (that's the "ran in seconds" bug).
+      throw new Error('audio engine not started — cannot analyze (press ▶ start audio first)');
+    }
     const decoded = await decodeArrayBuffer(ctx, file.data, file.name);
 
     // Everything heavy (peaks + beat + key) happens IN THE WORKER, off the main
@@ -182,6 +214,10 @@ export class AnalysisQueue {
       downbeats,
       analyzedAt: Date.now(),
     });
+    console.log(
+      `[analyze] track ${id}: ${r.bpm.toFixed(1)} bpm, key ${r.camelot || '?'}, ` +
+        `${r.downbeatFrames?.length ?? 0} downbeats — persisted`,
+    );
   }
 
   dispose(): void {
