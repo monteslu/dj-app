@@ -86,7 +86,7 @@ function RecordButton(): React.JSX.Element {
 }
 
 function Stage(): React.JSX.Element {
-  const { started, start, bus } = useDj();
+  const { started, bus } = useDj();
   const [showPrefs, setShowPrefs] = useState(false);
   const { prefs, toggleDensity, setPreset } = useLayoutControls();
 
@@ -151,11 +151,6 @@ function Stage(): React.JSX.Element {
         <button className="tiny" onClick={() => setShowPrefs(true)} title="Preferences">
           ⚙ preferences
         </button>
-        {!started && (
-          <button className="start-audio" onClick={() => void start()}>
-            ▶ start audio
-          </button>
-        )}
       </div>
       {showPrefs && <Preferences onClose={() => setShowPrefs(false)} />}
       <WaveformBand />
@@ -171,7 +166,7 @@ function Stage(): React.JSX.Element {
       <footer className="statusbar">
         <span>{NUM_DECKS} decks · 48 kHz</span>
         <span className={started ? 'status-live' : ''}>
-          {started ? '● audio running' : 'audio idle — click start or load a track'}
+          {started ? '● audio running' : 'audio idle — load a track to start'}
         </span>
       </footer>
     </div>

@@ -140,6 +140,14 @@ export function DjProvider({ children }: { children: ReactNode }): React.JSX.Ele
     });
   }, [runtime, started]);
 
+  // Auto-start the engine in Electron (our app, not an untrusted page → no autoplay-
+  // gesture requirement; main.ts disables that policy). Only the WEB build needs a
+  // user gesture, so there it starts on first interaction (track load / play) instead.
+  useEffect(() => {
+    const isWeb = (window as unknown as { __DJ_WEB__?: boolean }).__DJ_WEB__ === true;
+    if (!isWeb && !started) void start();
+  }, [started, start]);
+
   // SAB readback pump: the AudioWorklet writes play position, effective rate, and
   // VU levels into the shared buffer; this loop pulls them back into the bus each
   // frame so the UI (waveform position, BPM, meters) actually updates. Without it

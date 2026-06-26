@@ -16,6 +16,11 @@ if ('serviceWorker' in navigator) {
   if ('caches' in window) void caches.keys().then((ks) => ks.forEach((k) => void caches.delete(k)));
 }
 
+// Mark this as the WEB build: the browser autoplay policy requires a user gesture
+// before AudioContext can run, so the engine starts on first interaction (not auto).
+// In Electron we disable that policy and auto-start. (absent = Electron)
+(window as unknown as { __DJ_WEB__?: boolean }).__DJ_WEB__ = true;
+
 // Install the IPC stub first so anything reading window.dj at import time is safe.
 window.dj = makeBrowserDj();
 

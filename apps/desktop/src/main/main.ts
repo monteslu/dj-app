@@ -68,6 +68,11 @@ if (process.env.DJ_VSYNC !== '1') {
   app.commandLine.appendSwitch('disable-gpu-vsync');
 }
 
+// This is OUR app, not an untrusted web page, so the browser autoplay-gesture
+// requirement (which forces a "start audio" click before AudioContext can run) does
+// NOT apply. Disable it so the engine auto-starts on load — no start-audio button.
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+
 
 const SCHEME = 'app';
 const ISOLATION_HEADERS = {
