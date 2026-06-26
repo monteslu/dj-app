@@ -373,8 +373,9 @@ export class Engine {
     const g = deckGroup(d + 1);
     const node = this.node!;
 
-    // DEBUG: log play/pause with the position + beat phase at that instant, so we can
-    // correlate transport events with the snap + alignment dumps.
+    // DEBUG: log play/pause with the position + beat phase at that instant, plus BOTH
+    // decks' base vs current (effective) BPM, so transport events show whether the
+    // tempos are actually matched right then.
     this.disconnects.push(
       this.bus.connect(g, DeckKeys.play, (v) => {
         const pos = this.positionFrames(d);
@@ -382,9 +383,21 @@ export class Engine {
         const fbf = Math.max(0, this.bus.get(g, DeckKeys.firstBeatFrame));
         const fpb = bpm > 0 ? (60 / bpm) * this.sampleRate : 0;
         const phase = fpb > 0 ? ((((pos - fbf) % fpb) + fpb) % fpb) / fpb : 0;
+        const bpmInfo = (dd: number) => {
+          const gg = deckGroup(dd + 1);
+          const base = this.bus.get(gg, DeckKeys.fileBpm);
+          const ratio = this.bus.get(gg, DeckKeys.rateRatio) || 1;
+          return { base: +base.toFixed(2), current: +(base * ratio).toFixed(2), ratio: +ratio.toFixed(4) };
+        };
         console.log(
           `[TRANSPORT] deck ${d + 1} ${v > 0.5 ? 'PLAY' : 'PAUSE'}`,
-          JSON.stringify({ pos: Math.round(pos), posSec: +(pos / this.sampleRate).toFixed(3), beatPhase: +phase.toFixed(4) }),
+          JSON.stringify({
+            pos: Math.round(pos),
+            posSec: +(pos / this.sampleRate).toFixed(3),
+            beatPhase: +phase.toFixed(4),
+            deck1Bpm: bpmInfo(0),
+            deck2Bpm: bpmInfo(1),
+          }),
         );
       }),
     );
