@@ -47,6 +47,36 @@ export function nearestBeatFrame(grid: Grid, frame: number): number {
   return frameOfBeat(grid, idx);
 }
 
+const BEATS_PER_BAR = 4;
+
+/**
+ * Measure (bar) phase 0..1: position within the 4-beat bar. Aligning two decks on
+ * THIS (not just beat phase) makes their DOWNBEATS / measure markers line up, not
+ * just their beats — so the bars visibly snap together, not sit a beat or two off.
+ */
+export function measureDistance(grid: Grid, frame: number): number {
+  const idx = beatIndexAt(grid, frame) / BEATS_PER_BAR;
+  const frac = idx - Math.floor(idx);
+  return ((frac % 1) + 1) % 1;
+}
+
+/**
+ * Align the follower to the leader's MEASURE phase (downbeats line up), moving the
+ * smallest distance (≤ half a bar either way). Like alignedFrame but bar-granular.
+ */
+export function alignedToMeasure(
+  followerGrid: Grid,
+  followerFrame: number,
+  targetMeasurePhase: number,
+): number {
+  const barFrames = followerGrid.framesPerBeat * BEATS_PER_BAR;
+  const cur = measureDistance(followerGrid, followerFrame);
+  let delta = targetMeasurePhase - cur; // in bars (fraction)
+  if (delta > 0.5) delta -= 1;
+  else if (delta < -0.5) delta += 1;
+  return followerFrame + delta * barFrames;
+}
+
 /**
  * Phase-align: given a follower at `followerFrame` on its grid, return the frame
  * the follower should seek to so its beat phase matches the leader's `targetPhase`

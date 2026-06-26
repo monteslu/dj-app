@@ -17,7 +17,13 @@ import {
   DeckKeys,
   type ControlBus,
 } from '@dj/control-bus';
-import { makeGrid, beatDistance, alignedFrame, type Grid } from './beatgrid.js';
+import {
+  makeGrid,
+  beatDistance,
+  measureDistance,
+  alignedToMeasure,
+  type Grid,
+} from './beatgrid.js';
 
 export interface SyncDeps {
   bus: ControlBus;
@@ -113,10 +119,11 @@ export class SyncController {
     // instant phase snap only when both grids are known
     if (!fg || !lg) return;
 
-    // instant phase snap: align follower beat to leader beat
-    const leaderPhase = beatDistance(lg, this.deps.positionFrames(leaderIdx));
+    // instant phase snap: align the follower's MEASURE (downbeat) to the leader's,
+    // not just the beat — otherwise beats match but the bars sit a beat or two off.
+    const leaderPhase = measureDistance(lg, this.deps.positionFrames(leaderIdx));
     const followerFrame = this.deps.positionFrames(deckIndex);
-    const target = alignedFrame(fg, followerFrame, leaderPhase);
+    const target = alignedToMeasure(fg, followerFrame, leaderPhase);
     const total = this.deps.trackFrames(deckIndex);
     if (total > 0) {
       this.deps.seekFrames(deckIndex, Math.max(0, Math.min(total - 1, target)));
@@ -132,9 +139,9 @@ export class SyncController {
     const fg = this.grid(followerIdx);
     const lg = this.grid(leaderIdx);
     if (!fg || !lg) return false;
-    const leaderPhase = beatDistance(lg, this.deps.positionFrames(leaderIdx));
+    const leaderPhase = measureDistance(lg, this.deps.positionFrames(leaderIdx));
     const followerFrame = this.deps.positionFrames(followerIdx);
-    const target = alignedFrame(fg, followerFrame, leaderPhase);
+    const target = alignedToMeasure(fg, followerFrame, leaderPhase);
     const total = this.deps.trackFrames(followerIdx);
     if (total <= 0) return false;
     this.deps.seekFrames(followerIdx, Math.max(0, Math.min(total - 1, target)));
