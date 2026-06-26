@@ -17,13 +17,7 @@ import {
   DeckKeys,
   type ControlBus,
 } from '@dj/control-bus';
-import {
-  makeGrid,
-  beatDistance,
-  measureDistance,
-  alignedToMeasure,
-  type Grid,
-} from './beatgrid.js';
+import { makeGrid, beatDistance, alignedFrame, type Grid } from './beatgrid.js';
 
 export interface SyncDeps {
   bus: ControlBus;
@@ -119,11 +113,12 @@ export class SyncController {
     // instant phase snap only when both grids are known
     if (!fg || !lg) return;
 
-    // instant phase snap: align the follower's MEASURE (downbeat) to the leader's,
-    // not just the beat — otherwise beats match but the bars sit a beat or two off.
-    const leaderPhase = measureDistance(lg, this.deps.positionFrames(leaderIdx));
+    // SNAP: instantly seek the follower so it lands on the leader's EXACT beat
+    // phase (a hard jump to the same beat — Mixxx aligns on beat phase, not bars;
+    // automatic downbeat detection is unreliable, so the bar is the DJ's to nudge).
+    const leaderPhase = beatDistance(lg, this.deps.positionFrames(leaderIdx));
     const followerFrame = this.deps.positionFrames(deckIndex);
-    const target = alignedToMeasure(fg, followerFrame, leaderPhase);
+    const target = alignedFrame(fg, followerFrame, leaderPhase);
     const total = this.deps.trackFrames(deckIndex);
     if (total > 0) {
       this.deps.seekFrames(deckIndex, Math.max(0, Math.min(total - 1, target)));
@@ -139,9 +134,9 @@ export class SyncController {
     const fg = this.grid(followerIdx);
     const lg = this.grid(leaderIdx);
     if (!fg || !lg) return false;
-    const leaderPhase = measureDistance(lg, this.deps.positionFrames(leaderIdx));
+    const leaderPhase = beatDistance(lg, this.deps.positionFrames(leaderIdx));
     const followerFrame = this.deps.positionFrames(followerIdx);
-    const target = alignedToMeasure(fg, followerFrame, leaderPhase);
+    const target = alignedFrame(fg, followerFrame, leaderPhase);
     const total = this.deps.trackFrames(followerIdx);
     if (total <= 0) return false;
     this.deps.seekFrames(followerIdx, Math.max(0, Math.min(total - 1, target)));
