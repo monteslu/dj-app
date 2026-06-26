@@ -1,0 +1,21 @@
+{
+  "name": "@dj/stems",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "In-browser WebGPU stem separation (Demucs/ONNX) + WAV/AAC encode → NI-Stems .stem.mp4. Going beyond Mixxx: we GENERATE stems for live mashups. Renderer-only; requires WebGPU + the same-origin /webgpu-assets server.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./aac-worker": "./src/vendor/aacWorker.js"
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@dj/stem-mp4": "*",
+    "rawr": "^1.0.1"
+  }
+}
