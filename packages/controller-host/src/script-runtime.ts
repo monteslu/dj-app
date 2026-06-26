@@ -115,6 +115,13 @@ export function runMappingScript(
       setValue(): void {}
     };
   }
+  // NOTE: a handful of OLD pre-Components mappings (American Audio VMS2/VMS4, Hercules
+  // DJ Console RMX, Numark NS7, Stanton SCS) reference bare global classes
+  // (Button/Deck/Pot) AND build deep custom class hierarchies (addButton, illuminate,
+  // Decks.Left…) on top of removed Mixxx globals. Faithfully shimming those would mean
+  // reimplementing each device's class API — out of scope. They simply don't load; the
+  // 126 that DO cover all modern/common controllers. (Deliberately NOT shimming Button/
+  // Deck globally — it would shadow components.* for the working mappings.)
 
   // Build a preamble that, after the script runs, copies each functionprefix
   // local into the scope object so we can read them back out.
