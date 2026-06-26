@@ -9,16 +9,12 @@ import { useEffect, useState } from 'react';
 import { useDj } from '../dj-context.js';
 import { GENERIC_MIDI_XML, GENERIC_MIDI_JS } from '../mappings/generic-midi.js';
 
-interface Mapping {
-  id: string;
-  name: string;
-  xml: string;
-  js: string;
-}
 
-const MAPPINGS: Mapping[] = [
-  { id: 'generic', name: 'Generic MIDI (built-in)', xml: GENERIC_MIDI_XML, js: GENERIC_MIDI_JS },
-];
+interface MixxxMapping {
+  file: string;
+  name: string;
+  author: string;
+}
 
 export function ControllerSettings({
   onClose,
@@ -30,7 +26,8 @@ export function ControllerSettings({
   const { controllers } = useDj();
   const [inputs, setInputs] = useState<string[]>([]);
   const [device, setDevice] = useState<string>('');
-  const [mappingId, setMappingId] = useState<string>('generic');
+  const [mappings, setMappings] = useState<MixxxMapping[]>([]);
+  const [selected, setSelected] = useState<string>('generic');
   const [status, setStatus] = useState<string>('');
   const [supported, setSupported] = useState(true);
 
@@ -43,6 +40,9 @@ export function ControllerSettings({
         setInputs(inputs);
         setDevice(inputs[0] ?? '');
         if (inputs.length === 0) setStatus('No MIDI input devices found. Plug in a controller.');
+        // Load the full Mixxx mapping catalog (144 controllers).
+        const list = await window.dj.controllersList();
+        if (live) setMappings(list);
       } catch {
         if (live) {
           setSupported(false);
@@ -56,14 +56,24 @@ export function ControllerSettings({
   }, [controllers]);
 
   const load = () => {
-    const m = MAPPINGS.find((x) => x.id === mappingId);
-    if (!m) return;
-    try {
-      controllers.loadMapping(m.xml, m.js, device || undefined, device || undefined);
-      setStatus(`Loaded "${m.name}"${device ? ` on ${device}` : ''}.`);
-    } catch (e) {
-      setStatus(`Failed: ${String(e)}`);
-    }
+    void (async () => {
+      try {
+        if (selected === 'generic') {
+          controllers.loadMapping(GENERIC_MIDI_XML, GENERIC_MIDI_JS, device || undefined, device || undefined);
+          setStatus(`Loaded "Generic MIDI"${device ? ` on ${device}` : ''}.`);
+          return;
+        }
+        const m = mappings.find((x) => x.file === selected);
+        const res = await controllers.loadMixxxMapping(selected, true);
+        setStatus(
+          res
+            ? `Loaded "${res.name}"${device ? ` on ${device}` : ''}.`
+            : `Failed to load ${m?.name ?? selected}.`,
+        );
+      } catch (e) {
+        setStatus(`Failed: ${String(e)}`);
+      }
+    })();
   };
 
   const body = (
@@ -100,11 +110,12 @@ export function ControllerSettings({
             <div className="bus-route">
               <label>
                 <span className="bus-label">Mapping</span>
-                <span className="bus-hint">Drop Mixxx mappings here later</span>
+                <span className="bus-hint">{mappings.length} Mixxx controllers</span>
               </label>
-              <select value={mappingId} onChange={(e) => setMappingId(e.target.value)}>
-                {MAPPINGS.map((m) => (
-                  <option key={m.id} value={m.id}>
+              <select value={selected} onChange={(e) => setSelected(e.target.value)}>
+                <option value="generic">Generic MIDI (built-in)</option>
+                {mappings.map((m) => (
+                  <option key={m.file} value={m.file}>
                     {m.name}
                   </option>
                 ))}
