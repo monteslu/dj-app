@@ -12,7 +12,7 @@ import { deck as deckGroup, DeckKeys } from '@dj/control-bus';
 import { loadTrackToDeck } from '../track-loader.js';
 import { RowWaveform } from './RowWaveform.js';
 
-type SortCol = 'artist' | 'title' | 'album' | 'bpm' | 'duration' | 'genre';
+type SortCol = 'artist' | 'title' | 'album' | 'bpm' | 'duration' | 'genre' | 'stems';
 
 // Demo rows for visual development (?demo) — no DB/IPC needed.
 const DEMO_TRACKS: LibTrack[] = (
@@ -199,7 +199,8 @@ export function Library(): React.JSX.Element {
       setSortDesc((d) => !d);
     } else {
       setSortCol(col);
-      setSortDesc(false);
+      // stems: default to DESC so tracks WITH stems come first (then name); others ASC.
+      setSortDesc(col === 'stems');
     }
   };
 
@@ -250,7 +251,13 @@ export function Library(): React.JSX.Element {
               >
                 TIME{sortCol === 'duration' ? (sortDesc ? ' ▼' : ' ▲') : ''}
               </th>
-              <th>STEMS</th>
+              <th
+                onClick={() => toggleSort('stems')}
+                className={sortCol === 'stems' ? 'sorted' : ''}
+                title="Sort tracks with stems first, then by name"
+              >
+                STEMS{sortCol === 'stems' ? (sortDesc ? ' ▼' : ' ▲') : ''}
+              </th>
               <th>LOAD</th>
             </tr>
           </thead>

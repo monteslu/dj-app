@@ -19,7 +19,8 @@ const api: DjApi = {
     electron.ipcRenderer.on('library:scanProgress', listener);
     return () => electron.ipcRenderer.removeListener('library:scanProgress', listener);
   },
-  readTrackById: (id) => electron.ipcRenderer.invoke('library:readTrackById', id),
+  readTrackById: (id, preferOriginal) =>
+    electron.ipcRenderer.invoke('library:readTrackById', id, preferOriginal),
   librarySetAnalysis: (id, a) => electron.ipcRenderer.invoke('library:setAnalysis', id, a),
   libraryWaveform: (id) => electron.ipcRenderer.invoke('library:waveform', id),
   libraryDownbeats: (id) => electron.ipcRenderer.invoke('library:downbeats', id),

@@ -67,7 +67,9 @@ export interface DjApi {
   libraryCount: (search?: string) => Promise<number>;
   libraryScan: () => Promise<ScanSummary | null>;
   onScanProgress: (cb: (p: ScanProgress) => void) => () => void;
-  readTrackById: (id: number) => Promise<LoadedFile | null>;
+  /** Load a track's bytes. preferOriginal=true returns the original song file even if
+   *  stems exist (for analysis — smaller + decodes reliably; stems are for playback). */
+  readTrackById: (id: number, preferOriginal?: boolean) => Promise<LoadedFile | null>;
   librarySetAnalysis: (
     id: number,
     a: {

@@ -291,28 +291,56 @@ ipcMain.handle('recording:save', async (_e, wav: ArrayBuffer) => {
   await writeFile(result.filePath, Buffer.from(wav));
   return result.filePath;
 });
-ipcMain.handle('library:readTrackById', async (_e, id: number) => {
+ipcMain.handle('library:readTrackById', async (_e, id: number, preferOriginal?: boolean) => {
   const track = getLibrary().query({}).find((t) => t.id === id);
   if (!track) {
     return null;
   }
-  // Prefer the generated .stem.mp4 when present: it carries 4 independently-
-  // controllable stems for live mashups. Fall back to the original file. The
-  // original is never deleted, just ignored in favor of the stems.
-  let source = track.location;
-  let isStem = false;
-  if (track.stemPath) {
+  const exists = async (p: string | null | undefined): Promise<boolean> => {
+    if (!p) return false;
     try {
-      await access(track.stemPath);
-      source = track.stemPath;
-      isStem = true;
+      await access(p);
+      return true;
     } catch {
-      // The .stem.mp4 was deleted off disk — clear the stale link so the row stops
-      // showing "stems" and future loads use the original.
-      getLibrary().db.clearStems(track.id);
+      return false;
+    }
+  };
+  const hasStem = await exists(track.stemPath);
+  const hasOriginal = await exists(track.location);
+  // Drop a stale stem link so the row stops showing "stems" if the file's gone.
+  if (track.stemPath && !hasStem) getLibrary().db.clearStems(track.id);
+
+  // Source selection:
+  //  - PLAYBACK (default): prefer the .stem.mp4 (4 separable stems for mashups), else
+  //    the original.
+  //  - ANALYSIS (preferOriginal): prefer the ORIGINAL (smaller, decodes reliably; the
+  //    5-track .stem.mp4 is bigger and some don't decode cleanly). BUT if the user has
+  //    removed the original and kept only the .stem.mp4, fall back to the stem — its
+  //    first track is the mixdown, which is exactly what analysis wants.
+  let source: string;
+  let isStem: boolean;
+  if (preferOriginal) {
+    if (hasOriginal) {
       source = track.location;
+      isStem = false;
+    } else if (hasStem) {
+      source = track.stemPath!;
+      isStem = true; // analyzing the .stem.mp4's mixdown (original is gone)
+    } else {
+      return null; // nothing on disk
+    }
+  } else {
+    if (hasStem) {
+      source = track.stemPath!;
+      isStem = true;
+    } else if (hasOriginal) {
+      source = track.location;
+      isStem = false;
+    } else {
+      return null;
     }
   }
+
   const buf = await readFile(source);
   const arrayBuffer = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
   return { name: track.filename, data: arrayBuffer, path: source, isStem };

@@ -29,11 +29,15 @@ const SORTABLE = new Set([
   'rating',
   'dateAdded',
   'timesPlayed',
+  'stems',
 ]);
 
 const SORT_COLUMN_SQL: Record<string, string> = {
   dateAdded: 'datetime_added',
   timesPlayed: 'timesplayed',
+  // Stems: tracks that HAVE a generated .stem.mp4 first, then by title. The leading
+  // expression is a boolean (1/0); appending title makes it the tiebreaker.
+  stems: "(CASE WHEN stem_path IS NOT NULL AND stem_path != '' THEN 1 ELSE 0 END)",
 };
 
 export class LibraryDb {
@@ -302,6 +306,8 @@ export class LibraryDb {
     const sortCol = opts.sortColumn && SORTABLE.has(opts.sortColumn) ? opts.sortColumn : 'artist';
     const sqlCol = SORT_COLUMN_SQL[sortCol] ?? sortCol;
     sql += ` ORDER BY ${sqlCol} ${opts.sortDesc ? 'DESC' : 'ASC'}`;
+    // Stems sort: within the has-stems / no-stems groups, order by name (title).
+    if (sortCol === 'stems') sql += ', title COLLATE NOCASE ASC';
     if (opts.limit !== undefined) {
       sql += ' LIMIT ?';
       params.push(opts.limit);

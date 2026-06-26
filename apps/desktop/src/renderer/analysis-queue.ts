@@ -178,7 +178,9 @@ export class AnalysisQueue {
   }
 
   private async analyzeOne(id: number): Promise<void> {
-    const file = await window.dj.readTrackById(id);
+    // preferOriginal: analyze the original song file, NOT the .stem.mp4 (smaller +
+    // decodes reliably; analysis only needs the mixdown, which the original IS).
+    const file = await window.dj.readTrackById(id, /* preferOriginal */ true);
     if (!file) {
       throw new Error(`track ${id}: no file bytes (readTrackById returned null)`);
     }

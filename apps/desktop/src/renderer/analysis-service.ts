@@ -42,9 +42,14 @@ export interface BeatGridResult {
  * nothing playing; we can't, since our "batch" shares the one renderer process with
  * the UI, so we cap at ~60% always. Slightly above Mixxx's /2, same intent.
  */
-const POOL_CORE_FRACTION = 0.6;
-/** Absolute ceiling — diminishing returns + memory (each worker holds WASM heaps). */
-const MAX_POOL = 16;
+const POOL_CORE_FRACTION = 0.5;
+/**
+ * Absolute ceiling. This is MEMORY-bound, not CPU-bound: every in-flight track holds a
+ * full decoded AudioBuffer + a SAB copy + the worker's WASM heap (~100-250MB each), so
+ * too many concurrent decodes exhaust the renderer's address space mid-scan. 8 is a
+ * safe cap even on many-core machines.
+ */
+const MAX_POOL = 8;
 
 /** Safe pool size: ~60% of cores, at least 1, capped at MAX_POOL. */
 export function analysisPoolSize(): number {

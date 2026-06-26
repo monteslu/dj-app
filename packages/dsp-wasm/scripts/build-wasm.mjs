@@ -50,6 +50,7 @@ const modules = [
     defines: ['T_LINUX'],
     exports: ['_peaks_run', '_peaks_malloc', '_peaks_free'],
     growMemory: true,
+    maxMemory: 268435456, // 256MB — runs in the analysis worker pool (N× reserved)
   },
   {
     name: 'qmanalysis',
@@ -68,6 +69,7 @@ const modules = [
       '_qm_malloc', '_qm_free',
     ],
     growMemory: true,
+    maxMemory: 268435456, // 256MB — runs in the analysis worker pool (N× reserved)
   },
 ];
 
@@ -97,7 +99,10 @@ for (const m of modules) {
       '-s', `EXPORTED_FUNCTIONS=${JSON.stringify(m.exports)}`,
       '-s', `ALLOW_MEMORY_GROWTH=${m.growMemory ? 1 : 0}`,
       '-s', 'INITIAL_MEMORY=33554432',
-      ...(m.growMemory ? ['-s', 'MAXIMUM_MEMORY=536870912'] : []),
+      // Per-module heap cap. Analysis modules run in a POOL of N workers, so N × this
+      // is reserved address space — 512MB × 7 helped exhaust the renderer mid-scan.
+      // Cap those at maxMemory (256MB, ample for a track + qm-dsp); others default 512MB.
+      ...(m.growMemory ? ['-s', `MAXIMUM_MEMORY=${m.maxMemory ?? 536870912}`] : []),
       '-o', out,
     ],
     { stdio: 'inherit' },
