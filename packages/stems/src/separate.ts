@@ -98,7 +98,11 @@ export async function separateStems(
   if (!adapter) {
     throw new Error('WebGPU: no adapter — stem separation requires a working GPU.');
   }
-  onLog(`WebGPU adapter OK${adapter.info?.vendor ? ` (${adapter.info.vendor})` : ''}`);
+  const info = adapter.info ?? ({} as GPUAdapterInfo);
+  const adapterDesc = [info.vendor, info.architecture, info.device, info.description]
+    .filter(Boolean)
+    .join(' / ');
+  onLog(`WebGPU adapter OK — ${adapterDesc || 'unknown'}`);
 
   const { ort, demucs } = await loadLibs(base, onLog);
   onLog(`onnxruntime-web loaded — wasm threads: ${ort.env?.wasm?.numThreads ?? '?'}`);
@@ -133,12 +137,26 @@ export async function separateStems(
   const sec = (performance.now() - t0) / 1000;
   const audioSec = left.length / 44100; // demucs runs at 44.1k
   const rtf = audioSec / sec; // >1 = faster than realtime
-  // A WebGPU run is many× realtime; a CPU/WASM run is typically SLOWER than realtime.
-  // This is the definitive EP verdict the app can see at runtime.
-  const ep = webgpuDevice ? 'webgpu (device present)' : rtf >= 1.5 ? 'webgpu (by speed)' : 'WASM/CPU (SLOW — likely silent fallback!)';
-  onLog(
-    `[stems] separation done in ${sec.toFixed(1)}s — ${rtf.toFixed(2)}× realtime → EP = ${ep}`,
-  );
+
+  // Definitive EP verdict. The session is webgpu-only (no wasm in the EP list), so the
+  // DEVICE being present means the session bound WebGPU. But ORT can still run some
+  // operators on CPU internally — only the speed proves end-to-end GPU work:
+  //   - A real GPU run (esp. Apple/discrete) is comfortably FASTER than realtime.
+  //   - A CPU/WASM-dominated run is at or BELOW realtime.
+  // So: device present AND fast = confirmed GPU. Device present but SLOW = warn (likely
+  // heavy per-op CPU fallback). No device = we never should reach here (would've thrown).
+  const FAST = 1.5; // ×realtime threshold for "clearly GPU"
+  let verdict: string;
+  if (webgpuDevice && rtf >= FAST) {
+    verdict = `✅ WebGPU CONFIRMED (device present, ${rtf.toFixed(2)}× realtime)`;
+  } else if (webgpuDevice && rtf < FAST) {
+    verdict =
+      `⚠️ WebGPU device present but only ${rtf.toFixed(2)}× realtime — SLOW. Likely heavy ` +
+      `per-operator CPU fallback inside ORT. Investigate (op support / model).`;
+  } else {
+    verdict = `❌ NO WebGPU device — ran on CPU/WASM (${rtf.toFixed(2)}× realtime). This should not happen.`;
+  }
+  onLog(`[stems] separation done in ${sec.toFixed(1)}s (${audioSec.toFixed(0)}s audio) → ${verdict}`);
   onProgress(STEMS.reduce((a, s) => ({ ...a, [s]: 1 }), {}));
   return stems;
 }
