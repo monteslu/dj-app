@@ -76,7 +76,11 @@ export interface DjApi {
   libraryWaveform: (id: number) => Promise<Uint8Array | null>;
   /** Track ids not yet analyzed (for the background queue). */
   libraryUnanalyzed: (limit?: number) => Promise<number[]>;
+  /** Track ids with no generated stems yet (for the stem-generation queue). */
+  libraryStemless: (limit?: number) => Promise<number[]>;
   libraryIncrementPlay: (id: number) => Promise<void>;
+  /** Save generated .stem.mp4 bytes next to the track + link it. Returns the path. */
+  saveStems: (id: number, data: ArrayBuffer) => Promise<string | null>;
 
   /** Save a recording (WAV bytes) to disk; returns the path or null if canceled. */
   saveRecording: (wav: ArrayBuffer) => Promise<string | null>;

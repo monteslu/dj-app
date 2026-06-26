@@ -18,7 +18,7 @@
 import { app, BrowserWindow, ipcMain, dialog, protocol, net } from 'electron';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { readFile, writeFile, mkdir, access } from 'node:fs/promises';
-import { dirname, join, normalize } from 'node:path';
+import { dirname, join, normalize, basename, extname } from 'node:path';
 import { LibraryService } from './library-service.js';
 import type { QueryOptions } from '@dj/db';
 import { isWebGpuPath, resolveWebGpuPath } from '@dj/stems/asset-server';
@@ -243,6 +243,19 @@ ipcMain.handle(
 );
 ipcMain.handle('library:waveform', (_e, id: number) => getLibrary().getWaveform(id));
 ipcMain.handle('library:unanalyzed', (_e, limit?: number) => getLibrary().unanalyzedTrackIds(limit));
+ipcMain.handle('library:stemless', (_e, limit?: number) => getLibrary().db.stemlessTrackIds(limit));
+// Save generated stems (a .stem.mp4 the renderer produced via WebGPU) next to the
+// original track, and link it so playback prefers the 4 separable stems. Returns the
+// written path. The original file is never touched.
+ipcMain.handle('stems:save', async (_e, id: number, data: ArrayBuffer) => {
+  const track = getLibrary().query({}).find((t) => t.id === id);
+  if (!track) return null;
+  const base = basename(track.location, extname(track.location));
+  const stemPath = join(dirname(track.location), `${base}.stem.mp4`);
+  await writeFile(stemPath, new Uint8Array(data));
+  getLibrary().db.setStems(id, { stemPath });
+  return stemPath;
+});
 ipcMain.handle('library:incrementPlay', (_e, id: number) => getLibrary().incrementPlayCount(id));
 ipcMain.handle('track:cover', (_e, path: string) => getLibrary().getCover(path));
 

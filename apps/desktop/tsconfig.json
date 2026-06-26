@@ -7,14 +7,24 @@
     "lib": ["ES2023", "DOM", "DOM.Iterable", "WebWorker"],
     "types": ["@webgpu/types", "vite/client"],
     "composite": false,
-    "noEmit": true
+    "noEmit": true,
+    "paths": {
+      // These packages vendor untyped JS (stem-mp4) / untyped deps (rawr); their own
+      // tsconfig (allowJs + ambient d.ts) handles that. From here, resolve them to
+      // their BUILT declarations so this strict typecheck doesn't re-check the vendor
+      // source. The vite/esbuild builds alias to source separately and are unaffected.
+      "@dj/stem-mp4": ["../../packages/stem-mp4/dist/index.d.ts"],
+      "@dj/stems": ["../../packages/stems/dist/index.d.ts"]
+    }
   },
   "references": [
     { "path": "../../packages/control-bus" },
     { "path": "../../packages/audio-engine" },
     { "path": "../../packages/codec" },
     { "path": "../../packages/waveform" },
-    { "path": "../../packages/analysis" }
+    { "path": "../../packages/analysis" },
+    { "path": "../../packages/stem-mp4" },
+    { "path": "../../packages/stems" }
   ],
   "include": ["src/renderer/**/*", "src/shared/**/*"]
 }

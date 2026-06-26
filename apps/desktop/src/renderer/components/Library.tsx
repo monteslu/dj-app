@@ -6,6 +6,7 @@
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import type { LibTrack } from '../../shared/ipc.js';
+import type { StemStatus } from '../stem-queue.js';
 import { useDj, NUM_DECKS } from '../dj-context.js';
 import { deck as deckGroup, DeckKeys } from '@dj/control-bus';
 import { loadTrackToDeck } from '../track-loader.js';
@@ -51,10 +52,14 @@ const DEMO_TRACKS: LibTrack[] = (
 }));
 
 export function Library(): React.JSX.Element {
-  const { engine, bus, analysis, analysisQueue, started, start } = useDj();
+  const { engine, bus, analysis, analysisQueue, stemQueue, started, start } = useDj();
   const analysisStatus = useSyncExternalStore(
     (cb) => analysisQueue.subscribe(cb),
     () => analysisQueue.getStatus(),
+  );
+  const stemStatus = useSyncExternalStore(
+    (cb) => stemQueue.subscribe(cb),
+    () => stemQueue.getStatus(),
   );
   const [tracks, setTracks] = useState<LibTrack[]>([]);
   const [search, setSearch] = useState('');
@@ -95,6 +100,12 @@ export function Library(): React.JSX.Element {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // When stem generation finishes, re-query so the row's persisted stemPath shows
+  // (otherwise "✓ stems" relies only on the in-session done set).
+  useEffect(() => {
+    if (stemStatus.done.size > 0) void refresh();
+  }, [stemStatus.done, refresh]);
 
   useEffect(() => {
     // Guard: if the IPC bridge is missing (e.g. served the wrong entry), don't
@@ -148,6 +159,18 @@ export function Library(): React.JSX.Element {
     [engine, bus, analysis, started, start],
   );
 
+  // Generate stems (WebGPU Demucs) for a track. Needs the AudioContext running for
+  // decode; enqueue is one-at-a-time (GPU-heavy). The row shows live progress.
+  const generateStems = useCallback(
+    async (track: LibTrack) => {
+      if (!started) {
+        await start();
+      }
+      stemQueue.enqueue(track.id);
+    },
+    [stemQueue, started, start],
+  );
+
   const toggleSort = (col: SortCol) => {
     if (col === sortCol) {
       setSortDesc((d) => !d);
@@ -197,6 +220,7 @@ export function Library(): React.JSX.Element {
               >
                 TIME{sortCol === 'duration' ? (sortDesc ? ' ▼' : ' ▲') : ''}
               </th>
+              <th>STEMS</th>
               <th>LOAD</th>
             </tr>
           </thead>
@@ -228,6 +252,9 @@ export function Library(): React.JSX.Element {
                 <td className="num">{t.bpm > 0 ? t.bpm.toFixed(0) : ''}</td>
                 <td className="lib-key">{t.key ?? ''}</td>
                 <td className="num">{fmtDur(t.duration)}</td>
+                <td className="stem-cell">
+                  <StemCell track={t} status={stemStatus} onGenerate={generateStems} />
+                </td>
                 <td className="load-cells">
                   {Array.from({ length: NUM_DECKS }, (_, d) => (
                     <button
@@ -257,4 +284,67 @@ function fmtDur(s: number | null): string {
   const m = Math.floor(s / 60);
   const sec = Math.floor(s % 60);
   return `${m}:${sec.toString().padStart(2, '0')}`;
+}
+
+/**
+ * Per-row stems control: a "Generate" button → live progress bar while generating
+ * (where the button was) → a "✓ stems" badge when done. The headline feature:
+ * generate 4 separable stems on the GPU for live mashups.
+ */
+function StemCell({
+  track,
+  status,
+  onGenerate,
+}: {
+  track: LibTrack;
+  status: StemStatus;
+  onGenerate: (t: LibTrack) => void;
+}): React.JSX.Element {
+  const hasStems = !!track.stemPath || track.stemsGeneratedAt > 0 || status.done.has(track.id);
+  const generating = status.current === track.id;
+  const queued = !generating && status.remaining > 0 && !hasStems && !status.failed.has(track.id);
+
+  if (generating) {
+    const pct = Math.round(status.progress * 100);
+    return (
+      <div className="stem-progress" title={`${status.phase ?? ''} ${pct}%`}>
+        <div className="stem-progress-bar" style={{ width: `${pct}%` }} />
+        <span className="stem-progress-label">{pct}%</span>
+      </div>
+    );
+  }
+  if (hasStems) {
+    return (
+      <span className="stem-done" title="Stems generated (4 separable stems)">
+        ✓ stems
+      </span>
+    );
+  }
+  if (status.failed.has(track.id)) {
+    return (
+      <button
+        className="tiny stem-btn stem-retry"
+        onClick={(e) => {
+          e.stopPropagation();
+          onGenerate(track);
+        }}
+        title="Stem generation failed — click to retry"
+      >
+        ↻ retry
+      </button>
+    );
+  }
+  return (
+    <button
+      className="tiny stem-btn"
+      disabled={queued}
+      onClick={(e) => {
+        e.stopPropagation();
+        onGenerate(track);
+      }}
+      title="Generate 4 stems (drums/bass/other/vocals) on the GPU"
+    >
+      {queued ? 'queued' : 'gen stems'}
+    </button>
+  );
 }

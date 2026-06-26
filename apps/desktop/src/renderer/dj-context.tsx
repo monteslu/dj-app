@@ -20,6 +20,7 @@ import { ControlBus, standardControls, type Group, type Key } from '@dj/control-
 import { Engine } from '@dj/audio-engine';
 import { AnalysisService } from './analysis-service.js';
 import { AnalysisQueue } from './analysis-queue.js';
+import { StemQueue } from './stem-queue.js';
 import { startPerfMonitor } from './perf-monitor.js';
 import { onFrame } from './frame-loop.js';
 import { ControllerService } from './controller-service.js';
@@ -36,6 +37,7 @@ export interface DjRuntime {
   engine: Engine;
   analysis: AnalysisService;
   analysisQueue: AnalysisQueue;
+  stemQueue: StemQueue;
   controllers: ControllerService;
   recording: RecordingService;
   /** True once the AudioContext has been started (needs a user gesture). */
@@ -50,6 +52,7 @@ function buildRuntime(): {
   engine: Engine;
   analysis: AnalysisService;
   analysisQueue: AnalysisQueue;
+  stemQueue: StemQueue;
   controllers: ControllerService;
   recording: RecordingService;
 } {
@@ -84,9 +87,10 @@ function buildRuntime(): {
   const engine = new Engine({ bus, numDecks: NUM_DECKS, workletUrl });
   const analysis = new AnalysisService();
   const analysisQueue = new AnalysisQueue(engine, analysis);
+  const stemQueue = new StemQueue(engine);
   const controllers = new ControllerService(bus);
   const recording = new RecordingService(engine);
-  const runtime = { bus, engine, analysis, analysisQueue, controllers, recording };
+  const runtime = { bus, engine, analysis, analysisQueue, stemQueue, controllers, recording };
   // Expose the runtime for e2e/debugging (drive sync, read positions, inspect the
   // bus from the page). Harmless in prod; invaluable for the Playwright loop. The
   // loadToDeck helper uses the REAL load pipeline (decode → peaks → engine), so
@@ -137,6 +141,7 @@ export function DjProvider({ children }: { children: ReactNode }): React.JSX.Ele
       void runtime.engine.dispose();
       runtime.analysis.dispose();
       runtime.analysisQueue.dispose();
+      runtime.stemQueue.dispose();
       runtime.controllers.dispose();
     };
   }, [runtime]);
@@ -148,6 +153,7 @@ export function DjProvider({ children }: { children: ReactNode }): React.JSX.Ele
         engine: runtime.engine,
         analysis: runtime.analysis,
         analysisQueue: runtime.analysisQueue,
+        stemQueue: runtime.stemQueue,
         controllers: runtime.controllers,
         recording: runtime.recording,
         started,

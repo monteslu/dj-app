@@ -1202,6 +1202,51 @@ input[type='range'].xfader-slider::-webkit-slider-thumb {
   display: flex;
   gap: 4px;
 }
+
+/* ── stems cell (generate button / progress / done badge) ──────────── */
+.stem-cell {
+  min-width: 84px;
+}
+.stem-btn {
+  white-space: nowrap;
+}
+.stem-retry {
+  color: #ff6b6b;
+  border-color: rgba(255, 107, 107, 0.4);
+}
+.stem-done {
+  font-size: 11px;
+  font-weight: 600;
+  color: #4ade80;
+  white-space: nowrap;
+}
+/* live progress bar shown where the button was, while generating */
+.stem-progress {
+  position: relative;
+  height: 18px;
+  min-width: 78px;
+  border-radius: 4px;
+  background: #1a2030;
+  overflow: hidden;
+  border: 1px solid #2a3242;
+}
+.stem-progress-bar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(90deg, var(--accent, #3aa0ff), #6fd0ff);
+  transition: width 0.15s linear;
+}
+.stem-progress-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: #eaf4ff;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.6);
+}
 .library-empty {
   padding: 40px;
   text-align: center;
