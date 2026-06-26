@@ -83,6 +83,18 @@ describe.runIf(haveResources)('real Mixxx mappings', () => {
     let ok = 0;
     const failures: string[] = [];
     for (const { file } of index) {
+      // Each load is a FRESH app session — reset the shared Node global lodash polluted,
+      // so back-to-back loads in one test process behave like independent sessions.
+      try {
+        const g = globalThis as unknown as Record<PropertyKey, unknown>;
+        const d = Object.getOwnPropertyDescriptor(g, '_');
+        if (d) {
+          if (!d.configurable) Object.defineProperty(g, '_', { ...d, configurable: true });
+          delete g['_'];
+        }
+      } catch {
+        /* ignore */
+      }
       try {
         loadMapping(file);
         ok++;

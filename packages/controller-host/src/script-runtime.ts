@@ -66,11 +66,18 @@ export function runMappingScript(
     if (prop === '_') desc = { ...desc, configurable: true };
     return realDefineProperty(obj, prop, desc);
   };
-  // Best-effort: if the host global already has a locked `_`, try to relax it.
+  // Clear any stale `_` from a PRIOR mapping load on the host global so lodash defines a
+  // fresh one for this mapping (our patch keeps it configurable, so the delete works).
+  // Without this, a second lodash-based mapping inherits the first's `_` closure and its
+  // methods read as undefined. (App sessions are fresh; this matters for back-to-back
+  // loads / the bulk test.)
   try {
     const host = globalThis as unknown as Record<PropertyKey, unknown>;
     const d = Object.getOwnPropertyDescriptor(host, '_');
-    if (d && !d.configurable) realDefineProperty(host, '_', { ...d, configurable: true });
+    if (d) {
+      if (!d.configurable) realDefineProperty(host, '_', { ...d, configurable: true });
+      delete host['_'];
+    }
   } catch {
     /* ignore */
   }
@@ -119,21 +126,36 @@ export function runMappingScript(
   // `script` is a Mixxx global (common-controller-scripts.js). Many mappings AND
   // midi-components depend on it. Pass it as a parameter so it's in scope.
   //
-  // The helper libs (lodash.mixxx.js, midi-components-0.0.js) do `global.X = …` where
-  // `global === this` — so they attach `_` and `components` onto our `this` (scope) at
-  // RUNTIME. A `with(this)` block makes those bare identifiers (`components`, `_`)
-  // resolve from the scope object for the device script that follows, exactly as Mixxx's
-  // single global object does. (`with` is the correct tool for a dynamic global object.)
-  //
+  // The helper libs are written for ONE global object. lodash.mixxx.js resolves its root
+  // via `Function('return this')()` → the HOST global (globalThis), and defines `_`
+  // there; midi-components does `global.components = …` (global === our `this`). So `_`
+  // lands on globalThis while `components`/prefixes land on our scope. To present the
+  // device script with a SINGLE global where both resolve, we run inside `with(proxy)`:
+  // reads fall through scope → globalThis (so `_`, `components`, the prefixes all
+  // resolve), writes land on scope. The `has` trap returns true so `with` intercepts
+  // every bare identifier (and our injected params still shadow correctly).
+  const host = (typeof globalThis !== 'undefined' ? globalThis : {}) as Record<PropertyKey, unknown>;
+  // The injected function params must NOT be intercepted by `with` (else they'd resolve
+  // to the proxy → undefined). Returning false from `has` for them lets the parameter
+  // win; everything else is intercepted so it resolves scope → host.
+  const params = new Set(['engine', 'midi', 'console', 'script']);
+  const proxy = new Proxy(scope, {
+    has: (_t, prop) => !params.has(prop as string),
+    get: (target, prop) => (prop in target ? target[prop as string] : host[prop]),
+    set: (target, prop, value) => {
+      target[prop as string] = value;
+      return true;
+    },
+  });
   const body = `with (this) {\n${js}\n;${exporter}\n} return this;`;
   // eslint-disable-next-line @typescript-eslint/no-implied-eval
   const factory = new Function('engine', 'midi', 'console', 'script', body);
-  let result: Record<string, unknown>;
   try {
-    result = factory.call(scope, engine, midi, logger, scriptGlobal ?? {}) as Record<string, unknown>;
+    factory.call(proxy, engine, midi, logger, scriptGlobal ?? {});
   } finally {
     Object.defineProperty = realDefineProperty; // restore
   }
+  const result = scope; // prefixes/components were written onto scope via the proxy
 
   const resolveFn = (path: string): ((...a: Array<number | string>) => void) | undefined => {
     const parts = path.split('.');
