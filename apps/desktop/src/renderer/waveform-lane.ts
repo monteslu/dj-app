@@ -30,6 +30,15 @@ export class WaveformLaneController {
   private ro: ResizeObserver;
   private readonly group: string;
 
+  // Position smoothing. The worklet publishes playPosition only every ~10.7ms, so
+  // the raw value arrives in chunks; two synced decks de-quantize those chunks
+  // through DIFFERENT framesPerPx and their stutters don't match → one looks
+  // jittery vs the other. We extrapolate the position forward each frame at the
+  // deck's rate so both advance smoothly and stay locked. Safe now: heights are
+  // pixel-snapped (frozen), so a fractional position only slides the image.
+  private smoothFrames = -1;
+  private lastTime = 0;
+
   constructor(
     private readonly canvas: HTMLCanvasElement,
     private readonly bus: ControlBus,
@@ -86,7 +95,22 @@ export class WaveformLaneController {
     const rateRatio = this.bus.get(g, DeckKeys.rateRatio) || 1;
     const framesPerPx = baseFramesPerPx * rateRatio;
 
-    const positionFrames = fraction * frames;
+    // Smooth, rate-extrapolated position so the scroll flows between the worklet's
+    // chunky (~10.7ms) publishes — and two synced decks advance in lockstep (no
+    // relative jitter). Snap on pause/seek; advance by rate*elapsed while playing,
+    // converging gently to the published truth so it never drifts.
+    const publishedFrames = fraction * frames;
+    const playing = this.bus.get(g, DeckKeys.play) > 0.5;
+    const now = performance.now();
+    const dt = this.lastTime > 0 ? (now - this.lastTime) / 1000 : 0;
+    this.lastTime = now;
+    if (this.smoothFrames < 0 || !playing || Math.abs(publishedFrames - this.smoothFrames) > sr * 0.25) {
+      this.smoothFrames = publishedFrames; // first frame / paused / seek → snap
+    } else {
+      const advanced = this.smoothFrames + rateRatio * sr * dt;
+      this.smoothFrames = advanced + (publishedFrames - advanced) * 0.1; // converge
+    }
+    const positionFrames = this.smoothFrames;
     const t0 = performance.now();
     drawScrolling(this.canvas, st.peaks.detail, positionFrames, framesPerPx, DEFAULT_COLORS, {
       firstBeatFrame: fbf >= 0 ? fbf : 0,
