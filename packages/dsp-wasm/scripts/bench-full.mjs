@@ -15,6 +15,7 @@ import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { pathToFileURL } from 'node:url';
+import { performance } from 'node:perf_hooks';
 
 const MUSIC = join(homedir(), 'Music', 'mp3');
 const N = parseInt(process.argv[2] || '10', 10);
