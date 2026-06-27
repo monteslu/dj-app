@@ -25,6 +25,55 @@ export interface LoadedMapping {
   mapping: MidiMapping;
 }
 
+// Words that appear in OS-assigned MIDI port names but carry no device identity, so
+// they must not count toward a match (else "Numark DJ2GO2 Touch" vs "DJ2GO2 Touch
+// MIDI 1" would only share the meaningless "touch"/"midi"). Pure numbers (port
+// indices like the "1" in "… MIDI 1") are dropped too.
+const NOISE_TOKENS = new Set(['midi', 'port', 'in', 'out', 'input', 'output', 'device', 'usb']);
+
+/** Significant identity tokens of a device/mapping name (lowercased, alnum, de-noised). */
+export function nameTokens(name: string): string[] {
+  return name
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t && !NOISE_TOKENS.has(t) && !/^\d+$/.test(t));
+}
+
+/**
+ * A virtual/loopback port (ALSA "Midi Through", IAC, "Network", etc.) — never a real
+ * controller, so auto-connect must skip it. (Users can still pick one manually.)
+ */
+export function isVirtualPort(name: string | null | undefined): boolean {
+  if (!name) return false;
+  return /\b(midi through|through port|iac|loopmidi|network|virtual)\b/i.test(name);
+}
+
+/**
+ * Match a MIDI port to a requested name. Exact (case-insensitive) wins; otherwise the
+ * port matches if it shares a significant identity token with the requested name — so a
+ * mapping named "Numark DJ2GO2 Touch" binds to the OS device "DJ2GO2 Touch MIDI 1"
+ * (shared token "dj2go2"), which plain substring matching missed. Prefers the candidate
+ * with the most shared tokens.
+ */
+export function matchPort<T extends { name: string | null }>(ports: T[], name: string): T | null {
+  const want = name.toLowerCase();
+  const exact = ports.find((p) => p.name && p.name.toLowerCase() === want);
+  if (exact) return exact;
+  const wantTokens = new Set(nameTokens(name));
+  if (wantTokens.size === 0) return null;
+  let best: T | null = null;
+  let bestScore = 0;
+  for (const p of ports) {
+    if (!p.name) continue;
+    const score = nameTokens(p.name).filter((t) => wantTokens.has(t)).length;
+    if (score > bestScore) {
+      bestScore = score;
+      best = p;
+    }
+  }
+  return best;
+}
+
 export class ControllerService {
   private readonly engine: EngineApi;
   private access: MIDIAccess | null = null;
@@ -109,7 +158,11 @@ export class ControllerService {
 
   private attachGenericToFirstInput(): void {
     if (!this.access) return;
-    const first = [...this.access.inputs.values()].find((i) => i.state === 'connected');
+    // Prefer a REAL controller. ALSA exposes "Midi Through Port-0" (a virtual loopback)
+    // which is usually first in the list — auto-connecting to it does nothing useful.
+    // Skip virtual/through ports; only fall back to one if nothing else is connected.
+    const connected = [...this.access.inputs.values()].filter((i) => i.state === 'connected');
+    const first = connected.find((i) => !isVirtualPort(i.name)) ?? connected[0];
     if (!first) {
       console.log('[midi] no controller connected yet — will auto-connect when one is plugged in');
       return;
@@ -285,23 +338,11 @@ export class ControllerService {
 
 
   private findInput(name: string): MIDIInput | null {
-    if (!this.access) return null;
-    for (const i of this.access.inputs.values()) {
-      if (i.name && (i.name === name || i.name.includes(name) || name.includes(i.name))) {
-        return i;
-      }
-    }
-    return null;
+    return matchPort([...(this.access?.inputs.values() ?? [])], name);
   }
 
   private findOutput(name: string): MIDIOutput | null {
-    if (!this.access) return null;
-    for (const o of this.access.outputs.values()) {
-      if (o.name && (o.name === name || o.name.includes(name) || name.includes(o.name))) {
-        return o;
-      }
-    }
-    return null;
+    return matchPort([...(this.access?.outputs.values() ?? [])], name);
   }
 
   private disposeCurrent(): void {
