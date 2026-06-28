@@ -266,11 +266,18 @@ export function Library(): React.JSX.Element {
   // SelectTrackKnob/MoveVertical moves the visible highlight (and scrolls it into view).
   const selIndex = useControlValue(LIBRARY, LibraryKeys.selectedIndex);
   const rowRefs = useRef(new Map<number, HTMLTableRowElement>());
+  // Only scrollIntoView when the SELECTION actually moves (controller knob), never when
+  // `tracks` changes for another reason. The in-place stem-done patch makes a NEW tracks
+  // array, which used to re-fire this effect and jump the list when stems finished.
+  const lastScrolledIndex = useRef<number | null>(null);
   useEffect(() => {
     const t = tracks[Math.max(0, Math.min(tracks.length - 1, Math.round(selIndex)))];
     if (!t) return;
     setSelected(t.id);
-    rowRefs.current.get(t.id)?.scrollIntoView({ block: 'nearest' });
+    if (lastScrolledIndex.current !== selIndex) {
+      lastScrolledIndex.current = selIndex;
+      rowRefs.current.get(t.id)?.scrollIntoView({ block: 'nearest' });
+    }
   }, [selIndex, tracks]);
 
   // Generate stems (WebGPU Demucs) for a track. Needs the AudioContext running for
