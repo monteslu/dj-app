@@ -18,6 +18,7 @@
 import { app, BrowserWindow, ipcMain, dialog, protocol, net } from 'electron';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { readFile, writeFile, mkdir, access, readdir, rm } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { dirname, join, normalize, basename, extname } from 'node:path';
 import { LibraryService } from './library-service.js';
 import type { QueryOptions } from '@dj/db';
@@ -43,6 +44,17 @@ console.log(
 // "@dj/desktop", whose "/" produces a nested userData path
 // (.config/@dj/desktop) — fragile for file creation. Use a flat name.
 app.setName('MochaMix');
+
+// IMPORTANT: keep using the LEGACY 'dj-app' userData dir so the existing library + settings
+// survive the MochaMix rename. setName('MochaMix') would otherwise point Electron at a fresh
+// empty dir (<appData>/MochaMix) and the library would appear wiped. We pin userData to the
+// old path (<appData>/dj-app) when it exists, falling back to the new name for clean installs.
+{
+  const legacy = join(app.getPath('appData'), 'dj-app');
+  if (existsSync(legacy)) {
+    app.setPath('userData', legacy);
+  }
+}
 
 // WebGPU enablement — EXACTLY what loukai does (it runs WebGPU fine on this box).
 // MUST be set here (module load, before app ready) — switches applied inside
