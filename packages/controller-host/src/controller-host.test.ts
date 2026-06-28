@@ -78,18 +78,28 @@ describe('EngineApi — the Mixxx engine global', () => {
   });
 
   it('scratchEnable/isScratching/scratchDisable manage state + the scratch rate', () => {
-    const { bus, engine } = makeEngine();
-    expect(engine.isScratching(1)).toBe(false);
-    engine.scratchEnable(1, 128, 33.33, 1 / 8, (1 / 8) / 32);
-    expect(engine.isScratching(1)).toBe(true);
-    expect(bus.get(deck(1), DeckKeys.scratching)).toBe(1);
-    engine.scratchTick(1, 5);
-    // forward ticks → positive scratch rate
-    expect(bus.get(deck(1), DeckKeys.scratchRate)).toBeGreaterThan(0);
-    engine.scratchDisable(1);
-    expect(engine.isScratching(1)).toBe(false);
-    expect(bus.get(deck(1), DeckKeys.scratching)).toBe(0);
-    expect(bus.get(deck(1), DeckKeys.scratchRate)).toBe(0);
+    vi.useFakeTimers();
+    try {
+      const { bus, engine } = makeEngine();
+      expect(engine.isScratching(1)).toBe(false);
+      engine.scratchEnable(1, 128, 33.33, 1 / 8, 1 / 8 / 32);
+      expect(engine.isScratching(1)).toBe(true);
+      expect(bus.get(deck(1), DeckKeys.scratching)).toBe(1);
+      // Mixxx model: ticks accumulate; the 1ms scratch timer runs the alpha-beta filter
+      // and writes the rate. Feed several ticks across several timer passes (like a wheel
+      // being turned forward), then assert a positive rate built up.
+      for (let i = 0; i < 20; i++) {
+        engine.scratchTick(1, 5);
+        vi.advanceTimersByTime(1);
+      }
+      expect(bus.get(deck(1), DeckKeys.scratchRate)).toBeGreaterThan(0);
+      engine.scratchDisable(1);
+      expect(engine.isScratching(1)).toBe(false);
+      expect(bus.get(deck(1), DeckKeys.scratching)).toBe(0);
+      expect(bus.get(deck(1), DeckKeys.scratchRate)).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

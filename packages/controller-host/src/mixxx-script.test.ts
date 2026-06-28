@@ -54,22 +54,29 @@ describe('Mixxx-style mapping script against the engine global', () => {
   });
 
   it('a jog wheel scratches via engine.scratchEnable/Tick/Disable', () => {
-    const { bus, engine } = makeEngine();
-    const deck = 1;
+    vi.useFakeTimers();
+    try {
+      const { bus, engine } = makeEngine();
+      const deck = 1;
 
-    // touch the platter
-    engine.scratchEnable(deck, 128, 33 + 1 / 3, 1 / 8, (1 / 8) / 32);
-    expect(engine.isScratching(deck)).toBe(true);
+      // touch the platter
+      engine.scratchEnable(deck, 128, 33 + 1 / 3, 1 / 8, 1 / 8 / 32);
+      expect(engine.isScratching(deck)).toBe(true);
 
-    // a few jog ticks
-    for (let i = 0; i < 5; i++) {
-      engine.scratchTick(deck, 3);
+      // Turn the wheel forward: ticks accumulate, the 1ms scratch timer filters them
+      // into scratch2 (Mixxx model — not synchronous per tick).
+      for (let i = 0; i < 10; i++) {
+        engine.scratchTick(deck, 3);
+        vi.advanceTimersByTime(1);
+      }
+      expect(bus.get('[Channel1]', 'scratch2')).toBeGreaterThan(0);
+
+      // release
+      engine.scratchDisable(deck);
+      expect(engine.isScratching(deck)).toBe(false);
+    } finally {
+      vi.useRealTimers();
     }
-    expect(bus.get('[Channel1]', 'scratch2')).toBeGreaterThan(0);
-
-    // release
-    engine.scratchDisable(deck);
-    expect(engine.isScratching(deck)).toBe(false);
   });
 
   it('an init() that connects N hotcue LEDs works', () => {

@@ -197,13 +197,19 @@ export class EngineApi {
     }
   }
 
-  /** Stop all timers (on mapping shutdown). */
+  /** Stop all timers (on mapping shutdown) — engine.beginTimer timers AND scratch
+   * processing timers. A leaked scratch timer fires every 1ms forever (a real perf
+   * drain), so a mapping switch/unload must clear them too. */
   stopAllTimers(): void {
     for (const t of this.timers.values()) {
       clearTimeout(t);
       clearInterval(t);
     }
     this.timers.clear();
+    for (const s of this.scratch.values()) {
+      clearInterval(s.timer);
+    }
+    this.scratch.clear();
   }
 
   // --- Scratch (alpha-beta filter) ------------------------------------------
@@ -216,22 +222,44 @@ export class EngineApi {
     beta: number,
     _ramp = true,
   ): void {
-    this.scratch.set(deck, new ScratchState(intervalsPerRev, rpm, alpha, beta));
-    // engage scratch mode: deck plays at scratch2 (signed) under the wheel
+    // Faithful port of Mixxx ControllerScriptInterfaceLegacy::scratchEnable: scratchTick
+    // only ACCUMULATES intervals; a 1ms timer feeds (dx * accumulator) into an alpha-beta
+    // filter and writes scratch2 = predictedVelocity(), then clears the accumulator. This
+    // smooth-decay-on-stop is what makes scratching feel right; writing a raw per-tick
+    // velocity (the old bug) made it lurch and never settle.
+    const intervalsPerSecond = (rpm * intervalsPerRev) / 60.0;
+    if (intervalsPerSecond === 0) return; // invalid params (matches Mixxx)
+
+    const prev = this.scratch.get(deck);
+    if (prev) clearInterval(prev.timer);
+
+    const dx = 1.0 / intervalsPerSecond;
+    const filter = new AlphaBetaFilter();
+    // alpha/beta of 0 → use filter defaults (Mixxx does the same).
+    if (alpha && beta) filter.init(ALPHA_BETA_DT, 0, alpha, beta);
+    else filter.init(ALPHA_BETA_DT, 0);
+
+    const state: ScratchState = { dx, accumulator: 0, filter, timer: 0 as unknown as ReturnType<typeof setInterval> };
+    // The 1ms scratch process timer (Mixxx kScratchTimerMs = 1).
+    state.timer = setInterval(() => {
+      state.filter.observation(state.dx * state.accumulator);
+      this.setValue(`[Channel${deck}]`, 'scratch2', state.filter.predictedVelocity());
+      state.accumulator = 0;
+    }, SCRATCH_TIMER_MS);
+    this.scratch.set(deck, state);
+
     this.setValue(`[Channel${deck}]`, 'scratch2_enable', 1);
   }
 
   scratchTick(deck: number, interval: number): void {
     const s = this.scratch.get(deck);
-    if (!s) {
-      return;
-    }
-    s.tick(interval);
-    // Drive the deck at the scratch filter velocity (SIGNED — negative = reverse).
-    this.setValue(`[Channel${deck}]`, 'scratch2', s.velocity);
+    if (!s) return;
+    s.accumulator += interval; // accumulate only; the timer does the filtering
   }
 
   scratchDisable(deck: number, _ramp = true): void {
+    const s = this.scratch.get(deck);
+    if (s) clearInterval(s.timer);
     this.scratch.delete(deck);
     this.setValue(`[Channel${deck}]`, 'scratch2', 0);
     this.setValue(`[Channel${deck}]`, 'scratch2_enable', 0);
@@ -354,23 +382,52 @@ export class EngineApi {
 }
 
 /** Minimal alpha-beta scratch filter (Mixxx PositionScratchController-ish). */
-class ScratchState {
-  velocity = 0;
-  private position = 0;
-  constructor(
-    private readonly intervalsPerRev: number,
-    private readonly rpm: number,
-    private readonly alpha: number,
-    private readonly beta: number,
-  ) {}
+// Scratch timing — Mixxx: kScratchTimerMs = 1ms, kAlphaBetaDt = 1/1000s.
+const SCRATCH_TIMER_MS = 1;
+const ALPHA_BETA_DT = SCRATCH_TIMER_MS / 1000;
 
-  tick(interval: number): void {
-    // Target position increment from the jog interval.
-    this.position += interval / this.intervalsPerRev;
-    // Predict, then correct toward the measured movement (alpha-beta).
-    const target = (this.rpm / 60) * (interval / this.intervalsPerRev);
-    const error = target - this.velocity;
-    this.velocity += this.alpha * error;
-    this.velocity += this.beta * error;
+interface ScratchState {
+  dx: number; // seconds-per-interval (1 / intervalsPerSecond)
+  accumulator: number; // intervals received since the last timer pass
+  filter: AlphaBetaFilter;
+  timer: ReturnType<typeof setInterval>;
+}
+
+/**
+ * Alpha-beta filter — faithful port of Mixxx's util/alphabetafilter.h (itself from
+ * xwax). Given periodic observations of distance moved (dx) every dt seconds, it
+ * predicts the real velocity. This is the heart of turntable-feel scratching; the
+ * smooth velocity decay when the wheel stops (accumulator → 0 → observation 0) is what
+ * a hand-rolled per-tick velocity could never reproduce.
+ */
+class AlphaBetaFilter {
+  private initialized = false;
+  private dt = 0;
+  private x = 0;
+  private v = 0;
+  private alpha = 0;
+  private beta = 0;
+
+  init(dt: number, v: number, alpha = 1.0 / 512, beta = 1.0 / 512 / 1024): void {
+    this.initialized = true;
+    this.dt = dt;
+    this.x = 0;
+    this.v = v;
+    this.alpha = alpha;
+    this.beta = beta;
+  }
+
+  observation(dx: number): void {
+    if (!this.initialized) return;
+    const predictedX = this.x + this.v * this.dt;
+    const predictedV = this.v;
+    const residualX = dx - predictedX;
+    this.x = predictedX + residualX * this.alpha;
+    this.v = predictedV + (residualX * this.beta) / this.dt;
+    this.x -= dx; // relative to previous
+  }
+
+  predictedVelocity(): number {
+    return this.v;
   }
 }

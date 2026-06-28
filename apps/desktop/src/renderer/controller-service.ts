@@ -81,6 +81,8 @@ export class ControllerService {
   private userLoaded = false;
   /** True while restoreSavedMapping() is in flight — blocks the auto-connect race. */
   private restoring = false;
+  /** Set synchronously on the first autoConnect() so StrictMode's 2nd call is a no-op. */
+  private autoConnectStarted = false;
   /** Guards the one-time statechange hook for auto-connect. */
   private autoHooked = false;
   /** Cached Mixxx `script` helper global (common-controller-scripts.js), built once. */
@@ -140,10 +142,18 @@ export class ControllerService {
    * precedence (we don't auto-override the user's chosen mapping).
    */
   async autoConnect(): Promise<void> {
+    // Idempotent: React StrictMode (and any re-render) invokes the mounting effect
+    // TWICE in dev, so this was running twice → two restores raced, two mappings loaded,
+    // two routers + two midimessage listeners fought over every control (a press toggles
+    // twice → nets to nothing → "hardly any of it works"). Guard set SYNCHRONOUSLY so the
+    // second call bails before the first's first await.
+    if (this.autoConnectStarted) return;
+    this.autoConnectStarted = true;
     try {
       await this.init();
     } catch {
-      return; // Web MIDI unavailable
+      this.autoConnectStarted = false; // allow a retry if Web MIDI wasn't ready
+      return;
     }
     // Register the hot-plug handler BEFORE restoring, but gate it on `restoring` so a
     // device connecting mid-restore can't race in and auto-load Generic on top of (or
