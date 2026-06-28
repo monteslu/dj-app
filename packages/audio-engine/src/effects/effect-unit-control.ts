@@ -45,6 +45,25 @@ export class EffectUnitControl {
     this.offs.push(bus.connect(ug, EffectUnitKeys.super1, (v) => fx.setMeta(v)));
     this.offs.push(bus.connect(ug, EffectUnitKeys.mix, (v) => fx.setMix(v)));
 
+    // Unit-level effect selection: next_chain (pulse, +1) + chain_selector (signed). Both
+    // cycle slot 0's loaded effect — the unit's "chain" in our single-effect-per-unit model.
+    this.offs.push(
+      bus.connect(ug, EffectUnitKeys.nextChain, (v) => {
+        if (v > 0.5) {
+          this.selectChain(1);
+          bus.set(ug, EffectUnitKeys.nextChain, 0);
+        }
+      }),
+    );
+    this.offs.push(
+      bus.connect(ug, EffectUnitKeys.chainSelector, (v) => {
+        if (v !== 0) {
+          this.selectChain(v > 0 || v > 64 ? 1 : -1);
+          bus.set(ug, EffectUnitKeys.chainSelector, 0);
+        }
+      }),
+    );
+
     // Per-slot: enabled, manual params, effect selection.
     for (let s = 1; s <= EFFECT_SLOTS_PER_UNIT; s++) {
       const sg = effectSlot(unit, s);
@@ -91,6 +110,18 @@ export class EffectUnitControl {
     if (this.deps.bus.get(sg, EffectKeys.enabled) > 0.5) {
       this.deps.fx.loadEffect(slotIdx, EFFECT_CATALOG[this.slotEffect[slotIdx]!]!);
     }
+  }
+
+  /** Unit-level chain select (next_chain / chain_selector): cycle slot 0's effect AND
+   * ensure it's enabled, so a controller's FX-select encoder actually engages an effect. */
+  private selectChain(dir: number): void {
+    const n = EFFECT_CATALOG.length;
+    this.slotEffect[0] = (this.slotEffect[0]! + dir + n) % n;
+    const sg = effectSlot(this.deps.unit, 1);
+    if (this.deps.bus.get(sg, EffectKeys.enabled) <= 0.5) {
+      this.deps.bus.set(sg, EffectKeys.enabled, 1); // engaging the chain enables the slot
+    }
+    this.deps.fx.loadEffect(0, EFFECT_CATALOG[this.slotEffect[0]!]!);
   }
 
   dispose(): void {

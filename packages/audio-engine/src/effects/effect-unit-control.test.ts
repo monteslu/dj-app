@@ -69,6 +69,24 @@ describe('EffectUnitControl', () => {
     expect(s.bus.get(s.sg(1), EffectKeys.effectSelector)).toBe(0); // pulse reset
   });
 
+  it('next_chain cycles the unit effect, enables slot 1, and loads it (engages the chain)', () => {
+    s.bus.set(s.sg(1), EffectKeys.enabled, 0); // start disabled to prove it gets enabled
+    s.fx.loadEffect.mockClear();
+    s.bus.set(s.ug, EffectUnitKeys.nextChain, 1);
+    expect(s.bus.get(s.sg(1), EffectKeys.enabled)).toBe(1);
+    expect(s.fx.loadEffect).toHaveBeenCalledWith(0, expect.any(String));
+    expect(s.bus.get(s.ug, EffectUnitKeys.nextChain)).toBe(0); // pulse reset
+  });
+
+  it('chain_selector cycles by a signed delta', () => {
+    s.fx.loadEffect.mockClear();
+    s.bus.set(s.ug, EffectUnitKeys.chainSelector, 1);
+    expect(s.fx.loadEffect).toHaveBeenLastCalledWith(0, expect.any(String));
+    s.bus.set(s.ug, EffectUnitKeys.chainSelector, 127); // two's-complement -1
+    expect(s.fx.loadEffect).toHaveBeenLastCalledWith(0, expect.any(String));
+    expect(s.bus.get(s.ug, EffectUnitKeys.chainSelector)).toBe(0);
+  });
+
   it('dispose stops reacting', () => {
     s.ctl.dispose();
     s.fx.setMeta.mockClear();

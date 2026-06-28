@@ -61,7 +61,8 @@ export const EffectUnitKeys = {
   super1: 'super1', // the unit metaknob (0..1) — the main FX knob controllers turn
   mix: 'mix', // wet/dry (0..1)
   enabled: 'group_enabled', // unit on/off (synthetic; mappings often use mix)
-  nextChain: 'next_chain',
+  nextChain: 'next_chain', // pulse: cycle the unit's loaded effect forward
+  chainSelector: 'chain_selector', // signed: cycle the unit's loaded effect by N
   // per-channel routing: assign deck N through this unit. Built as group_[ChannelN]_enable.
 } as const;
 

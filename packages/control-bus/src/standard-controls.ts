@@ -279,6 +279,7 @@ function effectRackControls(numDecks: number): ControlDef[] {
       { group: ug, key: EffectUnitKeys.mix, default: 0, description: 'Unit wet/dry' },
       { group: ug, key: EffectUnitKeys.enabled, default: 0 },
       { group: ug, key: EffectUnitKeys.nextChain, default: 0 },
+      { group: ug, key: EffectUnitKeys.chainSelector, default: 0 },
     );
     // per-deck routing: route deck d through unit u
     for (let d = 1; d <= numDecks; d++) {
