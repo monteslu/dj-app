@@ -154,6 +154,31 @@
   box-sizing: border-box;
 }
 
+/* Themed scrollbars (Chromium/Electron) — the native bar was bright OS-default white.
+   Track = recessed bg, thumb = edge color, brighter on hover. Follows every theme via tokens. */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+::-webkit-scrollbar-track {
+  background: var(--sunken);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--edge);
+  border: 3px solid var(--sunken); /* inset look — thumb floats in the track */
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--edge-bright);
+}
+::-webkit-scrollbar-corner {
+  background: var(--sunken);
+}
+/* Firefox/standard fallback (harmless in Chromium) */
+* {
+  scrollbar-color: var(--edge) var(--sunken);
+}
+
 html,
 body,
 #root {
