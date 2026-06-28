@@ -42,7 +42,7 @@ console.log(
 // Set a clean app name BEFORE any getPath('userData') call. The package name is
 // "@dj/desktop", whose "/" produces a nested userData path
 // (.config/@dj/desktop) — fragile for file creation. Use a flat name.
-app.setName('dj-app');
+app.setName('MochaMix');
 
 // WebGPU enablement — EXACTLY what loukai does (it runs WebGPU fine on this box).
 // MUST be set here (module load, before app ready) — switches applied inside
@@ -181,8 +181,8 @@ function createWindow(): BrowserWindow {
     height: 900,
     minWidth: 900,
     minHeight: 600,
-    backgroundColor: '#0e1014',
-    title: 'dj-app',
+    backgroundColor: '#0f0c08',
+    title: 'MochaMix',
     webPreferences: {
       preload: join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -301,7 +301,7 @@ ipcMain.handle('display:open', () => {
     width: 1280,
     height: 720,
     backgroundColor: '#000000',
-    title: 'dj-app visualizer',
+    title: 'MochaMix visualizer',
     autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, 'preload.cjs'),
@@ -480,7 +480,7 @@ ipcMain.handle('track:cover', (_e, path: string) => getLibrary().getCover(path))
 // IPC: save a recording (WAV ArrayBuffer) to disk. Defaults to a Recordings
 // folder with a timestamped name; offers a Save dialog.
 ipcMain.handle('recording:save', async (_e, wav: ArrayBuffer) => {
-  const recDir = join(app.getPath('music'), 'dj-app Recordings');
+  const recDir = join(app.getPath('music'), 'MochaMix Recordings');
   await mkdir(recDir, { recursive: true }).catch(() => {});
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const defaultPath = join(recDir, `mix-${stamp}.wav`);

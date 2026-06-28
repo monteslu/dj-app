@@ -101,7 +101,7 @@ function Stage(): React.JSX.Element {
   return (
     <div className="app" data-theme={themeId}>
       <div className="titlebar">
-        <span className="brand">dj-app</span>
+        <span className="brand">MochaMix</span>
         <span className="tagline">built for the love of it</span>
         <span className="build-stamp" title="renderer build time">
           {typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : 'dev'}
