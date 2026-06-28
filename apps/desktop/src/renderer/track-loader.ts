@@ -10,13 +10,29 @@
  */
 
 import { decodeArrayBuffer, analysisFromDecoded } from '@dj/codec';
-import { computePeakSet, detailBucketsForDuration, packPeaks } from '@dj/waveform';
+import { detailBucketsForDuration, packPeaks, OVERVIEW_BUCKETS, type PeakData } from '@dj/waveform';
+import { WasmPeaks } from '@dj/dsp-wasm';
 import { deck as deckGroup, DeckKeys, type ControlBus } from '@dj/control-bus';
 import { camelotToKey, shortestStepsToCompatibleKey } from '@dj/analysis';
 import type { Engine } from '@dj/audio-engine';
 import { extractAllTracks } from '@dj/stem-mp4';
 import type { AnalysisService } from './analysis-service.js';
 import { setDeckTrack } from './deck-state.js';
+
+// Shared WASM+SIMD peak computer for load-time waveforms. The old pure-JS computePeakSet
+// walked every sample in a JS loop ON THE MAIN THREAD — ~844ms for a stem track's 5 peak
+// passes, a visible stall. The WASM path (same Mixxx Bessel-4 band peaks the analyzer
+// uses) does it in a fraction of that. Lazily built on first load.
+let peaksWasm: WasmPeaks | null = null;
+function computePeakSet(
+  channelData: Float32Array[],
+  frames: number,
+  detailBuckets: number,
+  sampleRate: number,
+): { detail: PeakData; overview: PeakData } {
+  peaksWasm ??= new WasmPeaks();
+  return peaksWasm.compute(channelData, frames, detailBuckets, OVERVIEW_BUCKETS, sampleRate);
+}
 
 export interface TrackLoaderDeps {
   engine: Engine;
