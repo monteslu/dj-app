@@ -560,6 +560,7 @@ ipcMain.handle('library:readTrackById', async (_e, id: number, preferOriginal?: 
       album: track.album ?? undefined,
       key: track.key ?? undefined,
       bpm: track.bpm ?? undefined,
+      firstBeatFrame: track.firstBeatFrame ?? undefined, // grid phase → correct beat align
     },
   };
 });

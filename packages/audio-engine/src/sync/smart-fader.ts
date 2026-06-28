@@ -50,10 +50,15 @@ export class SmartFader {
     this.offs.push(bus.connect(MASTER, MasterKeys.crossfader, () => this.tick()));
     this.offs.push(bus.connect(deckGroup(1), DeckKeys.fileBpm, () => this.evaluate()));
     this.offs.push(bus.connect(deckGroup(2), DeckKeys.fileBpm, () => this.evaluate()));
-    // Apply the RESTORED toggle state on construction. bus.connect only fires on future
-    // changes, so a persisted smartFaderEnabled=1 would otherwise sit inert (toggle shows
-    // on, but the blend isn't engaged) until the user toggled it.
-    this.evaluate();
+    // Apply the RESTORED toggle state on construction WITHOUT beat-aligning: at engine
+    // start no deck is playing, so a real align would be eaten (and would wrongly latch
+    // `active`, skipping the align when you actually drop the tracks). We only mirror the
+    // active flag for the UI; the first real activate() (with a playing deck) does the snap.
+    if (this.enabled() && this.leftBpm() > 0 && this.rightBpm() > 0) {
+      this.active = true;
+      this.deps.bus.set(MASTER, MasterKeys.smartFaderActive, 1);
+      this.tick();
+    }
   }
 
   private leftBpm(): number {

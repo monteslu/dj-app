@@ -19,20 +19,40 @@ describe('shortestBeatError', () => {
 });
 
 describe('SmartFader', () => {
-  function setup(leftBpm = 120, rightBpm = 128) {
+  function setup(leftBpm = 120, rightBpm = 128, enabledAtCtor = false) {
     const bus = new ControlBus();
     bus.defineAll(standardControls(2));
     bus.set(deck(1), DeckKeys.fileBpm, leftBpm);
     bus.set(deck(2), DeckKeys.fileBpm, rightBpm);
+    if (enabledAtCtor) bus.set(MASTER, MasterKeys.smartFaderEnabled, 1);
     const ratios: Record<number, number> = { 0: 1, 1: 1 };
+    let aligns = 0;
     const sf = new SmartFader({
       bus,
       setRateRatio: (d, r) => {
         ratios[d] = r;
       },
+      alignDecks: () => {
+        aligns++;
+      },
     });
-    return { bus, sf, ratios };
+    return { bus, sf, ratios, aligns: () => aligns };
   }
+
+  it('toggling smart fader ON beat-aligns the decks', () => {
+    const { bus, aligns } = setup(120, 128);
+    expect(aligns()).toBe(0);
+    bus.set(MASTER, MasterKeys.smartFaderEnabled, 1);
+    expect(aligns()).toBe(1); // activate() snaps once
+  });
+
+  it('a RESTORED enabled=1 at construction does NOT align (no playing deck yet)', () => {
+    // Regression: a persisted smartFaderEnabled=1 must reflect state but not fire the
+    // beat-snap at engine start (it would be eaten + latch active, killing the real snap).
+    const { sf, aligns } = setup(120, 128, /* enabledAtCtor */ true);
+    expect(sf.isActive()).toBe(true); // state restored
+    expect(aligns()).toBe(0); // but NOT aligned prematurely
+  });
 
   it('is inactive until enabled', () => {
     const { bus, sf } = setup();

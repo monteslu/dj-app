@@ -18,6 +18,8 @@ export interface LoadedFile {
     album?: string;
     key?: string;
     bpm?: number;
+    /** Stored grid phase (frame of beat 1) so sync/smart-fader align correctly. */
+    firstBeatFrame?: number;
   };
 }
 

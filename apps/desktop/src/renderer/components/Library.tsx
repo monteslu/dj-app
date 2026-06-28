@@ -242,6 +242,7 @@ export function Library(): React.JSX.Element {
           album: track.album,
           key: track.key,
           bpm: track.bpm,
+          firstBeatFrame: track.firstBeatFrame, // stored grid phase → correct beat align
         },
         coverPath: track.location,
         libraryId: track.id,

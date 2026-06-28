@@ -42,6 +42,9 @@ export interface LoadSource {
     album?: string | null;
     key?: string | null;
     bpm?: number;
+    /** Stored grid phase (frame of beat 1). Threaded so a known-BPM track gets the
+     *  RIGHT grid phase (not frame-0) without re-analysis — needed for sync/smart-fader. */
+    firstBeatFrame?: number;
   };
   /** Filesystem path for cover-art extraction (file.path or library location). */
   coverPath?: string;
@@ -134,6 +137,12 @@ export async function loadTrackToDeck(
   const g = deckGroup(deckIndex + 1);
   if (m.bpm && m.bpm > 0) {
     bus.set(g, DeckKeys.fileBpm, m.bpm);
+  }
+  // Restore the stored grid phase so a known-BPM track aligns on the REAL beat-one, not
+  // frame 0. Without this, sync/smart-fader snapped to a frame-0 grid (wrong phase).
+  // -1 = unknown; the analysis branch below fills it in.
+  if (m.firstBeatFrame != null && m.firstBeatFrame >= 0) {
+    bus.set(g, DeckKeys.firstBeatFrame, m.firstBeatFrame);
   }
   // Publish the numeric key (for harmonic match) + reset any prior key shift.
   bus.set(g, DeckKeys.fileKeyNum, m.key ? camelotToKey(m.key) : 0);
@@ -269,13 +278,26 @@ async function loadStemFile(
     engine.loadStems(deckIndex, stems, { bpm: m.bpm });
     const g = deckGroup(deckIndex + 1);
     if (m.bpm && m.bpm > 0) bus.set(g, DeckKeys.fileBpm, m.bpm);
+    // Restore the stored grid phase (same fix as the normal path) so a stems deck snaps
+    // to the REAL beat-one — without this, a stem deck used a frame-0 grid and never
+    // beat-aligned against a non-stem deck under sync / smart fader.
+    if (m.firstBeatFrame != null && m.firstBeatFrame >= 0) {
+      bus.set(g, DeckKeys.firstBeatFrame, m.firstBeatFrame);
+    }
 
-    // Background analysis of the mixdown for bpm/grid if unknown (so sync works).
-    if (!m.bpm || m.bpm <= 0) {
+    // Background analysis of the mixdown if the grid is unknown (bpm OR phase missing),
+    // so sync/smart-fader work even for an unanalyzed stem file.
+    if (!m.bpm || m.bpm <= 0 || m.firstBeatFrame == null || m.firstBeatFrame < 0) {
       void analysis.analyze(analysisFromDecoded(mixDecoded)).then((r) => {
         if (r.bpm > 0) {
           bus.set(g, DeckKeys.fileBpm, r.bpm);
           bus.set(g, DeckKeys.firstBeatFrame, r.firstBeatFrame);
+          if (src.libraryId != null) {
+            void window.dj.librarySetAnalysis(src.libraryId, {
+              bpm: r.bpm,
+              firstBeatFrame: r.firstBeatFrame,
+            });
+          }
         }
       });
     }
