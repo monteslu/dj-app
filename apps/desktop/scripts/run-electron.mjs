@@ -16,11 +16,12 @@ const electron = require('electron'); // resolves to the binary path string
 
 const env = { ...process.env };
 if (process.platform === 'linux' && !env.ELECTRON_OZONE_PLATFORM_HINT) {
-  // Native Wayland (auto). Without Vulkan enabled (see main.ts — WebGPU is opt-in
-  // via DJ_WEBGPU), the Wayland present path is FAST and the waveform WebGL flies.
-  // The Vulkan/Wayland incompatibility that pinned ~30fps only bites when Vulkan
-  // is on, which we no longer do by default.
-  env.ELECTRON_OZONE_PLATFORM_HINT = 'auto';
+  // X11 ozone — REQUIRED for WebGPU. main.ts enables Vulkan (the WebGPU/Dawn backend),
+  // and Vulkan is incompatible with the Wayland ozone path (vkAcquireNextImageKHR hangs
+  // / GPU-process crash), so Electron must run under X11. This matches loukai's config,
+  // which runs WebGPU fine on this same box. The commandLine ozone switch in main.ts is
+  // read too late on a Wayland session, so set it here as an env var (read at startup).
+  env.ELECTRON_OZONE_PLATFORM_HINT = 'x11';
 }
 
 const args = ['.', ...process.argv.slice(2)];

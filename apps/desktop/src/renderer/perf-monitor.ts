@@ -34,6 +34,16 @@ export function startPerfMonitor(intervalSec = 3): void {
     const renderer = dbg ? (gl as WebGLRenderingContext).getParameter(dbg.UNMASKED_RENDERER_WEBGL) : 'n/a';
     const ua = navigator.userAgent.match(/Chrome\/[\d.]+/)?.[0] ?? 'ua?';
     console.log(`[perf] env: ${ua} | webgl=${!!gl} | webgpu=${'gpu' in navigator} | renderer=${renderer}`);
+    // Probe whether WebGPU is FUNCTIONAL (an adapter exists), not just present —
+    // navigator.gpu can exist while requestAdapter() returns null (the real "is WebGPU
+    // usable" check). Async; logged when it resolves.
+    const gpu = (navigator as Navigator & { gpu?: GPU }).gpu;
+    if (gpu) {
+      void gpu
+        .requestAdapter({ powerPreference: 'high-performance' })
+        .then((a) => console.log(`[perf] webgpu adapter: ${a ? 'AVAILABLE ✓' : 'null (not usable)'}`))
+        .catch((e) => console.log(`[perf] webgpu adapter probe failed: ${(e as Error).message}`));
+    }
   } catch {
     /* never block startup on the version probe */
   }

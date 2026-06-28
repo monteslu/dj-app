@@ -44,23 +44,20 @@ console.log(
 // (.config/@dj/desktop) — fragile for file creation. Use a flat name.
 app.setName('dj-app');
 
-// WebGPU enablement. MUST be set here (module load, before app ready) — switches
-// applied inside whenReady() are read too late. Stem separation (Demucs) + future
-// ML run on WebGPU compute, so this is load-bearing, not optional:
+// WebGPU enablement — EXACTLY what loukai does (it runs WebGPU fine on this box).
+// MUST be set here (module load, before app ready) — switches applied inside
+// whenReady() are read too late.
 //   enable-unsafe-webgpu : makes navigator.gpu appear in Electron on Linux
-//   enable-features=Vulkan : provides the Dawn backend — without it WebGPU is
-//        absent or "super slow" (per loukai's verified config). Linux→Vulkan,
-//        macOS→Metal, Windows→D3D12 under the hood.
-// SPEED over experimental WebGPU. On Linux, enabling Vulkan is what forces
-// Chromium's native-Wayland present path into a slow ~30fps fallback ("wayland is
-// not compatible with Vulkan"). WebGPU on Linux is still experimental, so we do
-// NOT enable Vulkan by default — that keeps the fast GL present path on Wayland
-// and the waveform WebGL renderer flies. Stems (Demucs) run on WASM for now, like
-// loukai does on Wayland. Opt into WebGPU/Vulkan later with DJ_WEBGPU=1 (accepts
-// the frame-rate hit), e.g. for GPU stem separation on a beefy machine.
-if (process.env.DJ_WEBGPU === '1') {
-  app.commandLine.appendSwitch('enable-unsafe-webgpu');
-  app.commandLine.appendSwitch('enable-features', 'Vulkan');
+//   enable-features=Vulkan : provides the actual Dawn backend (without it WebGPU is
+//        absent or "super slow"). Linux→Vulkan, macOS→Metal, Windows→D3D12.
+// On Linux the Vulkan backend is incompatible with the Wayland ozone backend
+// (vkAcquireNextImageKHR hangs / GPU process crash), so WebGPU needs X11 ozone —
+// forced both here AND via ELECTRON_OZONE_PLATFORM_HINT in run-electron.mjs (the
+// commandLine switch alone is read too late on a Wayland session).
+app.commandLine.appendSwitch('enable-unsafe-webgpu');
+app.commandLine.appendSwitch('enable-features', 'Vulkan');
+if (process.platform === 'linux') {
+  app.commandLine.appendSwitch('ozone-platform', 'x11');
 }
 
 // Frame pacing. By DEFAULT we leave Chromium's normal vsync in place: rAF fires once
