@@ -17,6 +17,18 @@ export function TempoFader({
 }): React.JSX.Element {
   const g = deckGroup(deckIndex + 1);
   const [rate, setRate] = useControl(g, DeckKeys.rate);
+  const [rateDir] = useControl(g, DeckKeys.rateDirection);
+  const [rateRange] = useControl(g, DeckKeys.rateRange);
+  const dir = rateDir >= 0 ? 1 : -1;
+  // Bind the slider value DIRECTLY to `rate` (min -1, max +1). The fader CSS is
+  // vertical-lr + rtl, so max sits at the TOP. With the Mixxx default rate_dir = -1,
+  // speed = 1 + rate*range*(-1), so rate +1 = SLOWER and rate -1 = FASTER. That puts
+  // - (slower) at the top and + (faster) at the bottom — matching real CDJ/turntable
+  // faders and the DJ2GO2 hardware (Mixxx default "down increases speed").
+  // Tempo % shown (faster = positive). speed = 1 + rate*range*dir, so the % change is
+  // (speed-1)*100 = rate*range*dir*100. With rate_dir -1: rate -1 (fader at bottom/+) →
+  // +range → faster, displayed as a positive %.
+  const pct = rate * dir * (rateRange || 0.1) * 100;
   return (
     <div className={`tempo-fader ${side}`} aria-label={`Deck ${deckIndex + 1} tempo`}>
       <span className="fader-cap">TEMPO</span>
@@ -26,15 +38,14 @@ export function TempoFader({
         min={-1}
         max={1}
         step={0.001}
-        // top = faster: invert so up = +rate
-        value={-rate}
-        onChange={(e) => setRate(-Number(e.target.value))}
+        value={rate}
+        onChange={(e) => setRate(Number(e.target.value))}
         onDoubleClick={() => setRate(0)}
-        title={`Tempo / pitch fader (deck ${deckIndex + 1}). Drag up = faster, down = slower. Double-click to reset to 0%.`}
+        title={`Tempo / pitch fader (deck ${deckIndex + 1}). Down = faster, up = slower (CDJ/turntable style). Double-click to reset to 0%.`}
       />
       <span className="fader-val">
-        {rate >= 0 ? '+' : ''}
-        {(rate * 8).toFixed(1)}
+        {pct >= 0 ? '+' : ''}
+        {pct.toFixed(1)}%
       </span>
     </div>
   );

@@ -67,7 +67,9 @@ function deckControls(g: string): ControlDef[] {
     // tempo / rate
     { group: g, key: DeckKeys.rate, default: 0, min: -1, max: 1, description: 'Rate slider -1..1' },
     { group: g, key: DeckKeys.rateRange, default: 0.1, description: 'Rate range, e.g. 0.10 == ±10%' },
-    { group: g, key: DeckKeys.rateDirection, default: 1 },
+    // -1 = Mixxx default ("down increases speed"): rate -1 = faster, +1 = slower.
+    // Controller mappings (Pot invert:true) are tuned for this; keep it to match them.
+    { group: g, key: DeckKeys.rateDirection, default: -1 },
     { group: g, key: DeckKeys.rateRatio, default: 1, description: 'Effective rate ratio' },
     { group: g, key: DeckKeys.rateRatioOverride, default: 0, description: 'Sync/SmartFader ratio override; 0=off' },
     { group: g, key: DeckKeys.bpm, default: 0, description: 'Effective BPM' },
