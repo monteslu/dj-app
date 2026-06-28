@@ -1168,15 +1168,15 @@ body,
   width: var(--fader-w);
 }
 
-/* mixer reflow: when the center column is tight, drop the per-channel faders
-   (volume still lives on the deck-less strip via the crossfader + gain) so the
-   EQ knobs stay full-size and usable rather than everything shrinking to mush. */
+/* mixer reflow: when the center column is tight, drop only the center VU meters (cosmetic)
+   and let the volume faders get narrower — NEVER hide the volume sliders, volume is a
+   primary mix control. */
 @container mixer (max-width: 200px) {
-  .chan-fader {
-    display: none;
-  }
   .mixer-vus {
     display: none;
+  }
+  .chan-fader {
+    width: calc(var(--fader-w) * 0.7); /* slim, not gone */
   }
 }
 /* roomy mixer: a touch more breathing room between the strips */
