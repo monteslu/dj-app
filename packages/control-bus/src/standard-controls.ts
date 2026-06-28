@@ -8,6 +8,9 @@
 import {
   AppKeys,
   APP,
+  LIBRARY,
+  PLAYLIST,
+  LibraryKeys,
   deck,
   DeckKeys,
   MASTER,
@@ -35,6 +38,10 @@ function deckControls(g: string): ControlDef[] {
     { group: g, key: DeckKeys.cueGoto, default: 0 },
     { group: g, key: DeckKeys.start, default: 0 },
     { group: g, key: DeckKeys.stop, default: 0 },
+    // per-deck library load (mappings drive these on [ChannelN] = "load into deck N")
+    { group: g, key: LibraryKeys.loadSelectedTrack, default: 0 },
+    { group: g, key: LibraryKeys.loadSelectedTrackAndPlay, default: 0 },
+    { group: g, key: LibraryKeys.loadSelectedIntoFirstStopped, default: 0 },
 
     // position / state (published by the engine)
     { group: g, key: DeckKeys.playPosition, default: 0, description: 'Play position 0..1' },
@@ -200,12 +207,36 @@ function appControls(numDecks: number): ControlDef[] {
   ];
 }
 
+/** Library/browse controls — same set under [Library] and [Playlist] (old mappings use
+ * [Playlist] for the track-list nav). selectedIndex persists the highlight. */
+function libraryControls(): ControlDef[] {
+  const defs: ControlDef[] = [];
+  for (const g of [LIBRARY, PLAYLIST]) {
+    defs.push(
+      { group: g, key: LibraryKeys.selectedIndex, default: 0, description: 'Highlighted row' },
+      { group: g, key: LibraryKeys.moveVertical, default: 0 },
+      { group: g, key: LibraryKeys.moveUp, default: 0 },
+      { group: g, key: LibraryKeys.moveDown, default: 0 },
+      { group: g, key: LibraryKeys.selectTrackKnob, default: 0 },
+      { group: g, key: LibraryKeys.selectNextTrack, default: 0 },
+      { group: g, key: LibraryKeys.selectPrevTrack, default: 0 },
+      { group: g, key: LibraryKeys.selectNextPlaylist, default: 0 },
+      { group: g, key: LibraryKeys.selectPrevPlaylist, default: 0 },
+      { group: g, key: LibraryKeys.loadSelectedTrack, default: 0 },
+      { group: g, key: LibraryKeys.loadSelectedTrackAndPlay, default: 0 },
+      { group: g, key: LibraryKeys.loadSelectedIntoFirstStopped, default: 0 },
+      { group: g, key: LibraryKeys.goToItem, default: 0 },
+    );
+  }
+  return defs;
+}
+
 /**
  * The full standard control surface for `numDecks` decks. Pass to
  * `bus.defineAll(...)` at boot.
  */
 export function standardControls(numDecks: number): ControlDef[] {
-  const defs: ControlDef[] = [...appControls(numDecks), ...masterControls()];
+  const defs: ControlDef[] = [...appControls(numDecks), ...masterControls(), ...libraryControls()];
   for (let i = 1; i <= numDecks; i++) {
     defs.push(...deckControls(deck(i)));
   }

@@ -1,7 +1,7 @@
 /**
  * Group naming + control key constants, ported from Mixxx so we inherit its
- * controller-mapping ecosystem verbatim (see 03-architecture.md §1 and
- * 06-ui-controllers-effects.md §2). KEEP THESE NAMES EXACT — a stock Mixxx
+ * controller-mapping ecosystem verbatim (see 03-architecture.md 1 and
+ * 06-ui-controllers-effects.md 2). KEEP THESE NAMES EXACT  a stock Mixxx
  * mapping addresses `[Channel1],play`, `[Master],crossfader`, etc.
  *
  * This is not the full Mixxx control surface (that's hundreds of keys); it's the
@@ -70,6 +70,31 @@ export function eqEffect(deckGroup: Group): Group {
 export const MASTER: Group = '[Master]';
 /** App-wide controls (num_decks, num_samplers, ...). */
 export const APP: Group = '[App]';
+/** Mixxx library/browse group. Controllers navigate + load tracks via these. */
+export const LIBRARY: Group = '[Library]';
+/** Mixxx playlist/sidebar group (older mappings use [Playlist].SelectTrackKnob etc). */
+export const PLAYLIST: Group = '[Playlist]';
+
+/**
+ * Library/browse controls (Mixxx-compatible). The Select/Load/Move pulse controls are
+ * momentary: set to 1 (or a signed delta for the knob) to act, then self-reset.
+ * selectedIndex is the persisted highlight position the UI mirrors.
+ */
+export const LibraryKeys = {
+  selectedIndex: 'selected_index', // current highlighted row (our addition; UI mirrors it)
+  moveVertical: 'MoveVertical', // N rows (knob)
+  moveUp: 'MoveUp',
+  moveDown: 'MoveDown',
+  selectTrackKnob: 'SelectTrackKnob', // N rows in the track list
+  selectNextTrack: 'SelectNextTrack',
+  selectPrevTrack: 'SelectPrevTrack',
+  selectNextPlaylist: 'SelectNextPlaylist',
+  selectPrevPlaylist: 'SelectPrevPlaylist',
+  loadSelectedTrack: 'LoadSelectedTrack', //  first stopped deck (Mixxx: focused deck)
+  loadSelectedTrackAndPlay: 'LoadSelectedTrackAndPlay',
+  loadSelectedIntoFirstStopped: 'LoadSelectedIntoFirstStopped',
+  goToItem: 'GoToItem',
+} as const;
 
 // ---------------------------------------------------------------------------
 // Per-deck control keys (Mixxx names). Grown as milestones add features.
@@ -93,15 +118,15 @@ export const DeckKeys = {
   duration: 'duration', // seconds
 
   // tempo / rate
-  rate: 'rate', // -1..1, scaled by rateRange/direction → speed
-  rateRange: 'rateRange', // e.g. 0.10 == ±10%
+  rate: 'rate', // -1..1, scaled by rateRange/direction  speed
+  rateRange: 'rateRange', // e.g. 0.10 == 10%
   rateDirection: 'rate_dir', // +1 or -1
   rateRatio: 'rate_ratio', // effective rate ratio (1.0 == original)
   // Direct rate-ratio override used by sync / smart fader (which need ratios
-  // beyond the slider's ±range). 0 = inactive (use the slider); >0 = force ratio.
+  // beyond the slider's range). 0 = inactive (use the slider); >0 = force ratio.
   rateRatioOverride: 'rate_ratio_override',
   // Scratch: when scratching=1 the deck plays at scratchRate (which CAN be
-  // negative for reverse) regardless of play state — vinyl under the hand.
+  // negative for reverse) regardless of play state  vinyl under the hand.
   scratching: 'scratch2_enable',
   scratchRate: 'scratch2',
   bpm: 'bpm', // effective BPM at current rate
@@ -248,7 +273,7 @@ export const MasterKeys = {
   peakIndicatorL: 'peak_indicator_left',
   peakIndicatorR: 'peak_indicator_right',
 
-  // smart fader (our fork feature — see 09-smart-fader.md). Lives under [Master].
+  // smart fader (our fork feature  see 09-smart-fader.md). Lives under [Master].
   smartFaderEnabled: 'smart_fader_enabled',
   smartFaderActive: 'smart_fader_active',
   smartFaderLeftBpm: 'smart_fader_left_bpm',

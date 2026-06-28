@@ -4,13 +4,14 @@
  * via the deck buttons). Scan adds a folder.
  */
 
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { LibTrack } from '../../shared/ipc.js';
 import type { StemStatus } from '../stem-queue.js';
 import { useDj, useControlValue, NUM_DECKS } from '../dj-context.js';
-import { deck as deckGroup, DeckKeys } from '@dj/control-bus';
+import { deck as deckGroup, DeckKeys, LIBRARY, LibraryKeys } from '@dj/control-bus';
 import { camelotToKey, areKeysCompatible } from '@dj/analysis';
 import { loadTrackToDeck } from '../track-loader.js';
+import { LibraryControl } from '../library-control.js';
 import { RowWaveform } from './RowWaveform.js';
 
 type SortCol = 'artist' | 'title' | 'album' | 'bpm' | 'duration' | 'genre' | 'stems';
@@ -202,6 +203,47 @@ export function Library(): React.JSX.Element {
     [engine, bus, analysis, started, start],
   );
 
+  // --- Controller library navigation + loading ([Library]/[Playlist] controls) ---
+  // A controller navigates + loads tracks via bus controls. LibraryControl owns the
+  // selection index and reacts to them; we mirror it into the UI highlight (`selected`)
+  // and feed it the CURRENT displayed list + load fn via refs (so the singleton control
+  // always sees fresh data without re-subscribing).
+  const tracksRef = useRef<LibTrack[]>(tracks);
+  tracksRef.current = tracks;
+  const loadToDeckRef = useRef(loadToDeck);
+  loadToDeckRef.current = loadToDeck;
+  const firstStoppedRef = useRef(firstStoppedDeck);
+  firstStoppedRef.current = firstStoppedDeck;
+
+  useEffect(() => {
+    const ctl = new LibraryControl({
+      bus,
+      numDecks: NUM_DECKS,
+      trackCount: () => tracksRef.current.length,
+      firstStoppedDeck: () => firstStoppedRef.current(),
+      loadIndexToDeck: (i, deckIndex, play) => {
+        const t = tracksRef.current[i];
+        if (!t) return;
+        setSelected(t.id);
+        void loadToDeckRef.current(t, deckIndex).then(() => {
+          if (play) bus.set(deckGroup(deckIndex + 1), DeckKeys.play, 1);
+        });
+      },
+    });
+    return () => ctl.dispose();
+  }, [bus]);
+
+  // Mirror the bus selection index → the highlighted row id, so a controller's
+  // SelectTrackKnob/MoveVertical moves the visible highlight (and scrolls it into view).
+  const selIndex = useControlValue(LIBRARY, LibraryKeys.selectedIndex);
+  const rowRefs = useRef(new Map<number, HTMLTableRowElement>());
+  useEffect(() => {
+    const t = tracks[Math.max(0, Math.min(tracks.length - 1, Math.round(selIndex)))];
+    if (!t) return;
+    setSelected(t.id);
+    rowRefs.current.get(t.id)?.scrollIntoView({ block: 'nearest' });
+  }, [selIndex, tracks]);
+
   // Generate stems (WebGPU Demucs) for a track. Needs the AudioContext running for
   // decode; enqueue is one-at-a-time (GPU-heavy). The row shows live progress.
   const generateStems = useCallback(
@@ -294,16 +336,24 @@ export function Library(): React.JSX.Element {
             </tr>
           </thead>
           <tbody>
-            {tracks.map((t) => (
+            {tracks.map((t, i) => (
               <tr
                 key={t.id}
+                ref={(el) => {
+                  if (el) rowRefs.current.set(t.id, el);
+                  else rowRefs.current.delete(t.id);
+                }}
                 className={selected === t.id ? 'selected' : ''}
                 draggable
                 onDragStart={(e) => {
                   e.dataTransfer.setData('application/x-dj-track-id', String(t.id));
                   e.dataTransfer.effectAllowed = 'copy';
                 }}
-                onClick={() => setSelected(t.id)}
+                onClick={() => {
+                  setSelected(t.id);
+                  // Keep the controller's selection index in sync with mouse clicks.
+                  bus.set(LIBRARY, LibraryKeys.selectedIndex, i);
+                }}
                 onDoubleClick={() => void loadToDeck(t, firstStoppedDeck())}
                 title="Double-click → first stopped deck · drag onto a deck · or use the deck buttons →"
               >
