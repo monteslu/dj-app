@@ -50,6 +50,7 @@ function deckControls(g: string): ControlDef[] {
     { group: g, key: DeckKeys.cuePreview, default: 0 },
     { group: g, key: DeckKeys.startStop, default: 0 },
     { group: g, key: DeckKeys.playStutter, default: 0 },
+    { group: g, key: DeckKeys.reverse, default: 0 },
     { group: g, key: DeckKeys.reverseRoll, default: 0 },
     // per-deck library load (mappings drive these on [ChannelN] = "load into deck N")
     { group: g, key: LibraryKeys.loadSelectedTrack, default: 0 },
@@ -165,6 +166,18 @@ function deckControls(g: string): ControlDef[] {
     { group: g, key: DeckKeys.beatjumpSize, default: 4, description: 'Beats for beatjump fwd/back' },
     { group: g, key: DeckKeys.beatjumpForward, default: 0 },
     { group: g, key: DeckKeys.beatjumpBackward, default: 0 },
+    // loop move + scale
+    { group: g, key: DeckKeys.loopMove, default: 0 },
+    { group: g, key: DeckKeys.loopMoveForward, default: 0 },
+    { group: g, key: DeckKeys.loopMoveBackward, default: 0 },
+    { group: g, key: DeckKeys.loopScale, default: 0 },
+    // permanent pitch step + beatgrid BPM nudge
+    { group: g, key: DeckKeys.ratePermUp, default: 0 },
+    { group: g, key: DeckKeys.ratePermDown, default: 0 },
+    { group: g, key: DeckKeys.ratePermUpSmall, default: 0 },
+    { group: g, key: DeckKeys.ratePermDownSmall, default: 0 },
+    { group: g, key: DeckKeys.beatsAdjustFaster, default: 0 },
+    { group: g, key: DeckKeys.beatsAdjustSlower, default: 0 },
 
     ...hotcueControls(g),
     ...beatloopControls(g),

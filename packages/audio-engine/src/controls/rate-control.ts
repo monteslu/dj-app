@@ -15,6 +15,9 @@ import { DeckKeys, deck as deckGroup, type ControlBus } from '@dj/control-bus';
 
 const COARSE = 0.04; // +4% speed while held (Mixxx RateTempCoarse default)
 const FINE = 0.01; // +1% (RateTempFine / _small)
+const PERM_COARSE = 0.01; // permanent rate-slider step (Mixxx RatePermCoarse default 1%)
+const PERM_FINE = 0.0005; // _small permanent step
+const BPM_STEP = 1; // beats_adjust_faster/slower: +/-1 BPM to the stored tempo
 
 export interface RateControlDeps {
   bus: ControlBus;
@@ -27,7 +30,7 @@ export class RateControl {
   private readonly held: Array<{ up: number; down: number }> = [];
 
   constructor(private readonly deps: RateControlDeps) {
-    const { bus, numDecks } = deps;
+    const { numDecks } = deps;
     for (let d = 0; d < numDecks; d++) {
       this.held[d] = { up: 0, down: 0 };
       const g = deckGroup(d + 1);
@@ -35,7 +38,39 @@ export class RateControl {
       this.bind(g, d, DeckKeys.rateTempDown, 'down', COARSE);
       this.bind(g, d, DeckKeys.rateTempUpSmall, 'up', FINE);
       this.bind(g, d, DeckKeys.rateTempDownSmall, 'down', FINE);
+      // Permanent pitch step: nudge the rate slider and KEEP it (momentary pulse).
+      this.pulse(g, DeckKeys.ratePermUp, () => this.permRate(g, PERM_COARSE));
+      this.pulse(g, DeckKeys.ratePermDown, () => this.permRate(g, -PERM_COARSE));
+      this.pulse(g, DeckKeys.ratePermUpSmall, () => this.permRate(g, PERM_FINE));
+      this.pulse(g, DeckKeys.ratePermDownSmall, () => this.permRate(g, -PERM_FINE));
+      // beats_adjust_*: nudge the track's stored BPM (the beatgrid tempo).
+      this.pulse(g, DeckKeys.beatsAdjustFaster, () => this.adjustBpm(g, BPM_STEP));
+      this.pulse(g, DeckKeys.beatsAdjustSlower, () => this.adjustBpm(g, -BPM_STEP));
     }
+  }
+
+  /** Momentary control: fire on a nonzero value, then reset to 0 so it re-triggers. */
+  private pulse(g: string, key: string, fn: () => void): void {
+    this.offs.push(
+      this.deps.bus.connect(g, key, (v) => {
+        if (v > 0.5) {
+          fn();
+          this.deps.bus.set(g, key, 0);
+        }
+      }),
+    );
+  }
+
+  /** Permanently move the rate slider by `step` (clamped to [-1, 1]). */
+  private permRate(g: string, step: number): void {
+    const next = Math.max(-1, Math.min(1, this.deps.bus.get(g, DeckKeys.rate) + step));
+    this.deps.bus.set(g, DeckKeys.rate, next);
+  }
+
+  /** Nudge the track's stored BPM by `deltaBpm` (keeps it positive). */
+  private adjustBpm(g: string, deltaBpm: number): void {
+    const bpm = this.deps.bus.get(g, DeckKeys.fileBpm);
+    if (bpm > 0) this.deps.bus.set(g, DeckKeys.fileBpm, Math.max(1, bpm + deltaBpm));
   }
 
   /** A nudge button: while value>0 contribute +step to up/down; recompute rate_temp. */

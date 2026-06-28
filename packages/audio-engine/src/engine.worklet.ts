@@ -297,10 +297,16 @@ class EngineProcessor extends AudioWorkletProcessor {
       const ratioOverride = sabRead(control, idx.rateRatioOverride);
       const scratching = idx.scratching !== undefined && sabRead(control, idx.scratching) > 0.5;
       const scratchRate = idx.scratchRate !== undefined ? sabRead(control, idx.scratchRate) : 0;
+      // Reverse: latched `reverse` or momentary `reverseroll` (censor). reverseroll
+      // engages slip so playback returns to where it WOULD be on release.
+      const reverse = idx.reverse !== undefined && sabRead(control, idx.reverse) > 0.5;
+      const reverseRoll = idx.reverseRoll !== undefined && sabRead(control, idx.reverseRoll) > 0.5;
+      const reversing = reverse || reverseRoll;
       // Slip mode: setSlip is edge-idempotent (acts only on on/off transitions), so
       // pushing the current value every block is safe and keeps the ghost in sync.
+      // reverseroll forces slip on for its duration (the ghost runs forward underneath).
       if (idx.slipEnabled !== undefined) {
-        slot.playback.setSlip(sabRead(control, idx.slipEnabled) > 0.5);
+        slot.playback.setSlip(reverseRoll || sabRead(control, idx.slipEnabled) > 0.5);
       }
 
       // Scratch OVERRIDES everything: signed speed (negative = reverse), and it
@@ -322,6 +328,9 @@ class EngineProcessor extends AudioWorkletProcessor {
         // rate_temp_*). Additive so it bends ON TOP of sync/slider without disturbing them.
         const rateTemp = idx.rateTemp !== undefined ? sabRead(control, idx.rateTemp) : 0;
         speed += rateTemp;
+        // Reverse flips the sign of the (musical) speed. The slip ghost still advances
+        // FORWARD (it tracks musical position), so reverseroll snaps back correctly.
+        if (reversing) speed = -speed;
         processPlaying = playing;
       }
 

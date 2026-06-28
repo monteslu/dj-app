@@ -338,10 +338,14 @@ export class DeckPlayback {
     const outChannels = outputs.length;
 
     // Slip ghost: advance the linear (no-wrap) shadow position while playing, so when
-    // slip turns off we snap to where the song WOULD be. Tracks the musical speed; the
-    // audible output (loop/scratch) is unaffected.
+    // slip turns off we snap to where the song WOULD be. It tracks FORWARD musical
+    // progress (|speed|), so reverseroll — which plays audibly backward — still returns
+    // forward on release. The audible output (loop/scratch/reverse) is unaffected.
     if (this.slipEnabled && playing && speed !== 0) {
-      this.slipPosition = Math.min(track ? track.frames : 0, this.slipPosition + speed * numFrames);
+      this.slipPosition = Math.min(
+        track ? track.frames : 0,
+        this.slipPosition + Math.abs(speed) * numFrames,
+      );
     }
 
     if (!track || !playing || speed === 0) {

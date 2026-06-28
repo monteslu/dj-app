@@ -56,4 +56,28 @@ describe('RateControl (tempo nudge)', () => {
     expect(s.bus.get(deckGroup(2), DeckKeys.rateTemp)).toBeCloseTo(0.04, 5);
     expect(s.temp()).toBe(0); // deck 1 unaffected
   });
+
+  it('rate_perm_up/down permanently move the rate slider (and self-reset)', () => {
+    s.bus.set(s.g, DeckKeys.ratePermUp, 1);
+    expect(s.bus.get(s.g, DeckKeys.rate)).toBeCloseTo(0.01, 5);
+    expect(s.bus.get(s.g, DeckKeys.ratePermUp)).toBe(0); // pulse reset
+    s.bus.set(s.g, DeckKeys.ratePermUp, 1);
+    expect(s.bus.get(s.g, DeckKeys.rate)).toBeCloseTo(0.02, 5); // accumulates
+    s.bus.set(s.g, DeckKeys.ratePermDown, 1);
+    expect(s.bus.get(s.g, DeckKeys.rate)).toBeCloseTo(0.01, 5);
+  });
+
+  it('rate_perm clamps to [-1, 1]', () => {
+    s.bus.set(s.g, DeckKeys.rate, 0.999);
+    s.bus.set(s.g, DeckKeys.ratePermUp, 1); // would exceed 1
+    expect(s.bus.get(s.g, DeckKeys.rate)).toBe(1);
+  });
+
+  it('beats_adjust_faster/slower nudge the stored BPM', () => {
+    s.bus.set(s.g, DeckKeys.fileBpm, 128);
+    s.bus.set(s.g, DeckKeys.beatsAdjustFaster, 1);
+    expect(s.bus.get(s.g, DeckKeys.fileBpm)).toBe(129);
+    s.bus.set(s.g, DeckKeys.beatsAdjustSlower, 1);
+    expect(s.bus.get(s.g, DeckKeys.fileBpm)).toBe(128);
+  });
 });

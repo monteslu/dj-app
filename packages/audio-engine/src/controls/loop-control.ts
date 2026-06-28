@@ -106,9 +106,48 @@ export class LoopControl {
         }
       }),
     );
+
+    // loop_move: shift the whole loop region by N beats (signed value / fwd / back).
+    this.offs.push(
+      this.deps.bus.connect(this.deps.group, DeckKeys.loopMove, (v) => {
+        if (v !== 0) {
+          this.loopMove(v);
+          this.deps.bus.set(this.deps.group, DeckKeys.loopMove, 0);
+        }
+      }),
+    );
+    this.on(DeckKeys.loopMoveForward, () => this.loopMove(this.moveSize()));
+    this.on(DeckKeys.loopMoveBackward, () => this.loopMove(-this.moveSize()));
+    // loop_scale: multiply the loop length by the value (0.5 halves, 2 doubles).
+    this.offs.push(
+      this.deps.bus.connect(this.deps.group, DeckKeys.loopScale, (v) => {
+        if (v > 0) {
+          this.scale(v);
+          this.deps.bus.set(this.deps.group, DeckKeys.loopScale, 0);
+        }
+      }),
+    );
   }
 
   private rollReturnFrame = -1;
+
+  /** Beats to move per loop_move_forward/backward (Mixxx uses beatjump_size). */
+  private moveSize(): number {
+    return this.deps.bus.get(this.deps.group, DeckKeys.beatjumpSize) || 4;
+  }
+
+  /** Shift both loop bounds by `beats` (signed), clamped to the track. */
+  private loopMove(beats: number): void {
+    const start = this.start;
+    const end = this.end;
+    if (start < 0 || end <= start) return;
+    const delta = this.framesPerBeat() * beats;
+    const len = end - start;
+    const newStart = Math.max(0, Math.min(this.deps.trackFrames() - len, start + delta));
+    this.setStart(newStart);
+    this.deps.bus.set(this.deps.group, DeckKeys.loopEndPosition, newStart + len);
+    this.push();
+  }
 
   /** Snap to grid when quantize is on; identity otherwise. */
   private snap(frame: number): number {

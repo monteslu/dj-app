@@ -144,7 +144,8 @@ export const DeckKeys = {
   startPlay: 'start_play', // go to track start + play
   startStop: 'start_stop', // go to track start + stop
   playStutter: 'play_stutter', // restart from cue and play (stutter)
-  reverseRoll: 'reverseroll', // reverse (censor) while held; resume on release
+  reverse: 'reverse', // latched reverse playback (toggle)
+  reverseRoll: 'reverseroll', // reverse (censor) while held; slip-returns on release
   stop: 'stop',
 
   // position / state (read-mostly, published from the engine)
@@ -268,7 +269,21 @@ export const DeckKeys = {
   beatjumpSize: 'beatjump_size',
   beatjumpForward: 'beatjump_forward',
   beatjumpBackward: 'beatjump_backward',
+  // loop_move: shift the whole loop region by N beats (signed); loop_scale resizes it.
+  loopMove: 'loop_move', // signed beats
+  loopMoveForward: 'loop_move_forward',
+  loopMoveBackward: 'loop_move_backward',
+  loopScale: 'loop_scale', // multiply loop length by the value
   // beatloop_X_toggle controls are generated per-size (see beatloopKey).
+
+  // permanent pitch step (rate_perm_*): nudge the rate slider by a fixed step and KEEP it.
+  ratePermUp: 'rate_perm_up',
+  ratePermDown: 'rate_perm_down',
+  ratePermUpSmall: 'rate_perm_up_small',
+  ratePermDownSmall: 'rate_perm_down_small',
+  // beats_adjust_*: nudge the track's stored BPM (beatgrid tempo) up/down.
+  beatsAdjustFaster: 'beats_adjust_faster',
+  beatsAdjustSlower: 'beats_adjust_slower',
 } as const;
 
 export type DeckKey = (typeof DeckKeys)[keyof typeof DeckKeys];

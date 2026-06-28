@@ -86,6 +86,19 @@ describe('DeckPlayback loop wrap', () => {
     d.setSlip(false);
     expect(d.getPositionFrames()).toBe(2000); // unchanged
   });
+
+  it('reverse (negative speed) with slip: ghost advances FORWARD (reverseroll return)', () => {
+    const d = new DeckPlayback(48000);
+    d.loadTrack(ramp(100000));
+    d.seekFrames(20000);
+    d.setSlip(true);
+    const out = [new Float32Array(256), new Float32Array(256)];
+    // Play audibly BACKWARD (negative speed, as the worklet does for reverseroll).
+    for (let i = 0; i < 4; i++) d.process(out, 256, -1, true);
+    expect(d.getPositionFrames()).toBeLessThan(20000); // audible went backward
+    d.setSlip(false); // snap to the forward ghost
+    expect(d.getPositionFrames()).toBeGreaterThan(20000); // returned FORWARD
+  });
 });
 
 describe('CueControl', () => {
@@ -256,5 +269,26 @@ describe('LoopControl', () => {
     bus.set(g, DeckKeys.beatjump, -2); // back 2 beats
     expect(seeks.at(-1)).toBeCloseTo(50000 - 2 * 24000, 0);
     expect(bus.get(g, DeckKeys.beatjump)).toBe(0);
+  });
+
+  it('loop_move shifts both bounds by N beats (keeping length)', () => {
+    const { bus, g, setPosition } = setup(120); // 24000 frames/beat
+    setPosition(0);
+    bus.set(g, DeckKeys.loopIn, 1);
+    setPosition(48000);
+    bus.set(g, DeckKeys.loopOut, 1); // loop 0..48000 (2 beats)
+    bus.set(g, DeckKeys.loopMove, 2); // +2 beats = +48000
+    expect(bus.get(g, DeckKeys.loopStartPosition)).toBeCloseTo(48000, 0);
+    expect(bus.get(g, DeckKeys.loopEndPosition)).toBeCloseTo(96000, 0); // length preserved
+  });
+
+  it('loop_scale multiplies the loop length', () => {
+    const { bus, g, setPosition } = setup();
+    setPosition(0);
+    bus.set(g, DeckKeys.loopIn, 1);
+    setPosition(4000);
+    bus.set(g, DeckKeys.loopOut, 1); // 0..4000
+    bus.set(g, DeckKeys.loopScale, 2); // double
+    expect(bus.get(g, DeckKeys.loopEndPosition)).toBe(8000);
   });
 });
