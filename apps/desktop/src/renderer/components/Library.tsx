@@ -321,9 +321,9 @@ export function Library(): React.JSX.Element {
     [stemQueue, started, start],
   );
 
-  // Explicit table width = the two fixed utility cols (WAVE 134 + LOAD 72) + every resizable
+  // Explicit table width = the two fixed utility cols (WAVE 124 + LOAD 72) + every resizable
   // column's current width. Needed so table-layout:fixed honors the <col> widths (see table JSX).
-  const FIXED_COLS_W = 134 + 72;
+  const FIXED_COLS_W = 124 + 72;
   const tableWidth = FIXED_COLS_W + COLUMNS.reduce((sum, c) => sum + (widths[c.id] ?? 0), 0);
 
   const toggleSort = (col: SortCol) => {

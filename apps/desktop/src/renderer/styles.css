@@ -1370,11 +1370,12 @@ input[type='range'].xfader-slider::-webkit-slider-thumb {
 
 /* per-row mini waveform (rekordbox/VirtualDJ style); pre-rendered to an image */
 .th-wave {
-  width: 128px;
+  width: 124px;
 }
 .td-wave {
-  padding: 2px 6px !important;
-  width: 128px;
+  /* hug the 120px thumbnail: 2px L/R padding → 124px total, no dead space before ARTIST */
+  padding: 2px 2px !important;
+  width: 124px;
 }
 .rowwave {
   display: inline-block;
@@ -1411,7 +1412,7 @@ input[type='range'].xfader-slider::-webkit-slider-thumb {
 }
 /* fixed utility columns (not user-resizable) */
 .library-table col.col-wave {
-  width: 134px;
+  width: 124px;
 }
 .library-table col.col-load {
   width: 72px;
