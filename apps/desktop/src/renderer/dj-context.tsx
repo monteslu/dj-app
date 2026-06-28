@@ -231,8 +231,30 @@ export function useDj(): DjRuntime {
 export function useControl(group: Group, key: Key): [number, (v: number) => void] {
   const { bus } = useDj();
 
+  // Coalesce bus changes to at most ONE React re-render per animation frame. A MIDI
+  // fader/knob sweep emits a BURST of bus updates (hundreds/sec); notifying React on
+  // each one re-renders the component at MIDI rate → the laggy/janky fader animation.
+  // The bus value updates instantly (audio stays correct); the UI only needs to repaint
+  // at frame rate. getSnapshot still returns the live value, so the frame paints current.
   const subscribe = useCallback(
-    (onChange: () => void) => bus.connect(group, key, onChange),
+    (onChange: () => void) => {
+      let dirty = false;
+      let unsubFrame: (() => void) | null = null;
+      const offBus = bus.connect(group, key, () => {
+        if (dirty) return; // already scheduled for this frame
+        dirty = true;
+        unsubFrame = onFrame(() => {
+          dirty = false;
+          unsubFrame?.();
+          unsubFrame = null;
+          onChange();
+        });
+      });
+      return () => {
+        offBus();
+        unsubFrame?.();
+      };
+    },
     [bus, group, key],
   );
   const getSnapshot = useCallback(() => bus.get(group, key), [bus, group, key]);
