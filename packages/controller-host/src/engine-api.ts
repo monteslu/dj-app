@@ -292,6 +292,17 @@ export class EngineApi {
     else this.softTakeoverState.set(`${group}.${key}`, { engaged: true, ignoreNext: true });
   }
 
+  /** Mixxx engine.softTakeoverWillIgnore: would the next value be ignored (still
+   * waiting to catch / a value is queued to skip)? Part of the engine interface. */
+  softTakeoverWillIgnore(group: Group, key: Key, incomingParam: number): boolean {
+    const st = this.softTakeoverState.get(`${group}.${key}`);
+    if (!st) return false;
+    if (st.ignoreNext) return true;
+    if (!st.engaged) return false;
+    const cur = this.getParameter(group, key);
+    return Math.abs(incomingParam - cur) > SOFT_TAKEOVER_THRESHOLD;
+  }
+
   /**
    * Should a soft-takeover control ACCEPT this incoming parameter (0..1)? Returns true
    * if soft-takeover isn't active for it, or if the value has caught the current value
@@ -309,8 +320,7 @@ export class EngineApi {
     }
     if (!st.engaged) return true; // already caught → pass through
     const current = this.getParameter(group, key); // 0..1
-    const THRESH = 0.04; // ~5/127 — close enough to "catch"
-    if (Math.abs(incomingParam - current) <= THRESH) {
+    if (Math.abs(incomingParam - current) <= SOFT_TAKEOVER_THRESHOLD) {
       st.engaged = false; // caught — from now on values pass through
       return true;
     }
@@ -356,8 +366,22 @@ export class EngineApi {
   isBrakeActive(deck: number): boolean {
     return this.isScratching(deck);
   }
+  isSpinbackActive(deck: number): boolean {
+    return this.isScratching(deck);
+  }
   isSoftStartActive(_deck: number): boolean {
     return false;
+  }
+
+  /**
+   * Mixxx engine.convertCharset(targetCharset, value) — re-encode a string for a
+   * device display (e.g. Latin-1/Shift-JIS LCDs). The browser only deals in UTF-16
+   * strings and our outputs are LED/byte sends, so we return the string unchanged
+   * (the common case is UTF-8/ASCII track titles). Present so mappings that call it
+   * don't throw — completes the engine interface.
+   */
+  convertCharset(_targetCharset: unknown, value: string): string {
+    return value;
   }
 
   /** Multi-deck shared data (some mappings stash cross-deck state here). */
@@ -385,6 +409,10 @@ export class EngineApi {
 // Scratch timing — Mixxx: kScratchTimerMs = 1ms, kAlphaBetaDt = 1/1000s.
 const SCRATCH_TIMER_MS = 1;
 const ALPHA_BETA_DT = SCRATCH_TIMER_MS / 1000;
+
+// Soft-takeover catch threshold (0..1 parameter space). ~5/127 — close enough that a
+// physical knob is considered to have "caught" the software value.
+const SOFT_TAKEOVER_THRESHOLD = 0.04;
 
 interface ScratchState {
   dx: number; // seconds-per-interval (1 / intervalsPerSecond)
