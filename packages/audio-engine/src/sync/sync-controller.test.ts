@@ -84,6 +84,21 @@ describe('SyncController', () => {
     expect(s.rate[1]).toBeCloseTo(128 / 120, 3);
   });
 
+  it('beatsync (momentary) matches tempo WITHOUT latching sync_enabled', () => {
+    const g1 = deckGroup(1);
+    const g2 = deckGroup(2);
+    s.bus.set(g1, DeckKeys.fileBpm, 128);
+    s.bus.set(g1, DeckKeys.firstBeatFrame, 0);
+    s.bus.set(g1, DeckKeys.play, 1);
+    s.bus.set(g2, DeckKeys.fileBpm, 120);
+    s.bus.set(g2, DeckKeys.firstBeatFrame, 0);
+    // tap beatsync on deck 2 (what a controller Sync button sends)
+    s.bus.set(g2, DeckKeys.beatsync, 1);
+    expect(s.rate[1]).toBeCloseTo(128 / 120, 3); // tempo matched once
+    expect(s.bus.get(g2, DeckKeys.syncEnabled)).toBe(0); // did NOT latch follow-sync
+    expect(s.bus.get(g2, DeckKeys.beatsync)).toBe(0); // pulse self-reset → can re-fire
+  });
+
   it('releases the override when SYNC is disabled', () => {
     const g2 = deckGroup(2);
     s.bus.set(deckGroup(1), DeckKeys.fileBpm, 120);

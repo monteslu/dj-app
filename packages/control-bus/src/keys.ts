@@ -110,6 +110,7 @@ export const DeckKeys = {
   keylock: 'keylock',
 
   // beat sync (Mixxx-compatible names)
+  beatsync: 'beatsync', // pulse: one-shot match tempo + phase to the other deck (no latch)
   syncEnabled: 'sync_enabled', // 1 = this deck follows the sync leader
   syncLeader: 'sync_leader', // 1 = this deck is the explicit sync leader
   syncRequest: 'sync_request', // pulse: set 1 to ask the worklet to phase-snap NOW; worklet clears it

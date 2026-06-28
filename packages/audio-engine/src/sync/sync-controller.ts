@@ -43,7 +43,36 @@ export class SyncController {
       // toggling sync on a deck re-snaps immediately
       this.offs.push(bus.connect(g, DeckKeys.syncEnabled, () => this.onSyncToggle(d)));
       this.offs.push(bus.connect(g, DeckKeys.syncLeader, () => this.onSyncToggle(d)));
+      // beatsync: a momentary "sync now" (Mixxx) — match tempo + phase ONCE, no latch.
+      // This is what most controller sync buttons send on a tap (the DJ2GO2 SyncButton
+      // sends beatsync; only a long-press latches sync_enabled). Trigger on the >0.5
+      // edge and self-reset so it re-fires.
+      this.offs.push(
+        bus.connect(g, DeckKeys.beatsync, (v) => {
+          if (v > 0.5) {
+            this.beatSync(d);
+            bus.set(g, DeckKeys.beatsync, 0);
+          }
+        }),
+      );
     }
+  }
+
+  /**
+   * One-shot beat sync (Mixxx `beatsync`): match this deck's tempo to the other deck
+   * and phase-align once, WITHOUT enabling follow-sync. Reuses the same leader pick +
+   * tempo match as the latching path.
+   */
+  beatSync(deckIndex: number): void {
+    const leaderIdx = this.pickLeader(deckIndex);
+    if (leaderIdx < 0 || leaderIdx === deckIndex) return;
+    const leaderBpm = this.deps.bus.get(deckGroup(leaderIdx + 1), DeckKeys.fileBpm);
+    const followerBpm = this.deps.bus.get(deckGroup(deckIndex + 1), DeckKeys.fileBpm);
+    if (followerBpm <= 0 || leaderBpm <= 0) return;
+    const factor = this.halfDoubleFactor(followerBpm, leaderBpm);
+    this.deps.setRateRatio(deckIndex, leaderBpm / (followerBpm * factor));
+    // Phase-align once (seek), unlike the latching path which defers to the worklet.
+    this.phaseAlign(deckIndex, leaderIdx);
   }
 
   private grid(deckIndex: number): Grid | null {
