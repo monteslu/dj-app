@@ -16,7 +16,8 @@
     "start": "npm run build && node scripts/run-electron.mjs --no-sandbox",
     "dev:web": "vite --config vite.browser.config.ts",
     "build:web": "vite build --config vite.browser.config.ts",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "pack:publish": "npm run build && node scripts/make-publish-package.mjs"
   },
   "dependencies": {
     "@dj/audio-engine": "*",
