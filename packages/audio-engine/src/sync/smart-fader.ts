@@ -50,6 +50,10 @@ export class SmartFader {
     this.offs.push(bus.connect(MASTER, MasterKeys.crossfader, () => this.tick()));
     this.offs.push(bus.connect(deckGroup(1), DeckKeys.fileBpm, () => this.evaluate()));
     this.offs.push(bus.connect(deckGroup(2), DeckKeys.fileBpm, () => this.evaluate()));
+    // Apply the RESTORED toggle state on construction. bus.connect only fires on future
+    // changes, so a persisted smartFaderEnabled=1 would otherwise sit inert (toggle shows
+    // on, but the blend isn't engaged) until the user toggled it.
+    this.evaluate();
   }
 
   private leftBpm(): number {
