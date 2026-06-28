@@ -337,19 +337,7 @@ body,
 .deck-top {
   display: flex;
   gap: calc(12px * var(--u));
-  align-items: stretch; /* the right column fills the record's height (no dead space) */
-}
-/* right column beside the record: track info on top, transport pinned to the bottom so
-   the buttons sit alongside the record instead of below it. */
-.deck-top-col {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: calc(6px * var(--u));
-}
-.deck-top-col .deck-transport {
-  margin-top: auto; /* push transport to the bottom of the column, aligned to record base */
+  align-items: center;
 }
 
 /* container-query reflow: when a deck is narrow, stack platter above the info
@@ -375,7 +363,9 @@ body,
 }
 .platter {
   position: relative;
-  width: clamp(64px, 6vw, 88px);
+  /* large record (the deck's focal point, Serato/rekordbox style) — fills the height
+     next to the track info instead of a small puck with dead space beside it. */
+  width: clamp(96px, 9vw, 132px);
   aspect-ratio: 1;
   flex: 0 0 auto;
 }
@@ -686,7 +676,6 @@ body,
   display: flex;
   gap: 8px;
   align-items: center;
-  flex-wrap: wrap; /* now lives in the narrower column beside the record — wrap to fit */
 }
 /* EVERY button in the row is a tight fixed height with the extra space as vertical
    MARGIN (not internal padding) — cue/play and sync/qnt/keylock/bend/pfl all match. */
