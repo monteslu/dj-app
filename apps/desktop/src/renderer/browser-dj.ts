@@ -18,6 +18,7 @@ function track(
     id, location: `mem://${id}`, filename: `${artist} - ${title}.wav`,
     artist, title, album, genre, year: '2024', duration: durationSec, bitrate: 320,
     bpm, firstBeatFrame: 0, key, rating: 0, timesPlayed: 0, filetype: 'wav',
+    dateAdded: '2026-01-01 12:00:00',
     stemPath: null, stemsGeneratedAt: 0,
   };
 }

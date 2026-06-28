@@ -17,6 +17,9 @@ export const COLUMN_IDS = [
   'bpm',
   'key',
   'time',
+  'year',
+  'added',
+  'path',
   'stems',
 ] as const;
 export type ColumnId = (typeof COLUMN_IDS)[number];
@@ -24,6 +27,7 @@ export type ColumnId = (typeof COLUMN_IDS)[number];
 export type ColumnWidths = Record<ColumnId, number>;
 
 const KEY = 'dj-library-columns';
+const VIS_KEY = 'dj-library-columns-visible';
 const MIN_WIDTH = 48;
 const DEFAULTS: ColumnWidths = {
   artist: 170,
@@ -33,7 +37,26 @@ const DEFAULTS: ColumnWidths = {
   bpm: 64,
   key: 64,
   time: 64,
+  year: 60,
+  added: 90,
+  path: 260,
   stems: 92,
+};
+
+// Columns shown by default. The optional ones (year, added, path) are off until the user
+// turns them on via the header right-click menu (Mixxx / rekordbox behavior).
+const DEFAULT_VISIBLE: Record<ColumnId, boolean> = {
+  artist: true,
+  title: true,
+  album: true,
+  genre: true,
+  bpm: true,
+  key: true,
+  time: true,
+  year: false,
+  added: false,
+  path: false,
+  stems: true,
 };
 
 let current: ColumnWidths = load();
@@ -81,6 +104,44 @@ export function useColumnWidths(): ColumnWidths {
       return () => listeners.delete(cb);
     },
     getColumnWidths,
+  );
+}
+
+// --- column visibility (toggled via the header right-click menu) -------------
+let visible: Record<ColumnId, boolean> = loadVisible();
+const visListeners = new Set<() => void>();
+
+function loadVisible(): Record<ColumnId, boolean> {
+  try {
+    const raw = localStorage.getItem(VIS_KEY);
+    if (raw) return { ...DEFAULT_VISIBLE, ...(JSON.parse(raw) as Partial<Record<ColumnId, boolean>>) };
+  } catch {
+    /* ignore */
+  }
+  return { ...DEFAULT_VISIBLE };
+}
+
+export function toggleColumn(id: ColumnId): void {
+  visible = { ...visible, [id]: !visible[id] };
+  try {
+    localStorage.setItem(VIS_KEY, JSON.stringify(visible));
+  } catch {
+    /* ignore */
+  }
+  for (const l of visListeners) l();
+}
+
+export function getColumnVisibility(): Record<ColumnId, boolean> {
+  return visible;
+}
+
+export function useColumnVisibility(): Record<ColumnId, boolean> {
+  return useSyncExternalStore(
+    (cb) => {
+      visListeners.add(cb);
+      return () => visListeners.delete(cb);
+    },
+    getColumnVisibility,
   );
 }
 
@@ -155,10 +216,11 @@ export function resetColumnWidths(): void {
 /** Convenience hook: widths + a resize starter + reset. */
 export function useColumns() {
   const widths = useColumnWidths();
+  const visible = useColumnVisibility();
   const onResizeStart = useCallback((id: ColumnId, e: React.PointerEvent) => {
     e.preventDefault();
     e.stopPropagation(); // don't trigger the header's sort click
     startColumnResize(id, e.clientX, e.currentTarget as HTMLElement, e.pointerId);
   }, []);
-  return { widths, onResizeStart, reset: resetColumnWidths, didJustResize };
+  return { widths, visible, toggleColumn, onResizeStart, reset: resetColumnWidths, didJustResize };
 }

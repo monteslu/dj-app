@@ -1838,6 +1838,19 @@ input[type='range'].xfader-slider::-webkit-slider-thumb {
   font-weight: 600;
   font-size: 12px;
 }
+.library-table td.lib-added {
+  color: var(--text-dim);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.library-table td.lib-path {
+  color: var(--text-faint);
+  font-size: 11px;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  /* td already clips with ellipsis; the title shows the full path on hover */
+  direction: rtl; /* keep the filename (end of path) visible when truncated */
+  text-align: left;
+}
 .library-table tbody tr {
   cursor: default;
 }

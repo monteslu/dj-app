@@ -28,10 +28,13 @@ const COLUMNS: { id: ColumnId; label: string; sort: SortCol | null }[] = [
   { id: 'bpm', label: 'BPM', sort: 'bpm' },
   { id: 'key', label: 'KEY', sort: null },
   { id: 'time', label: 'TIME', sort: 'duration' },
+  { id: 'year', label: 'YEAR', sort: null },
+  { id: 'added', label: 'ADDED', sort: 'dateAdded' },
+  { id: 'path', label: 'PATH', sort: null },
   { id: 'stems', label: 'STEMS', sort: 'stems' },
 ];
 
-type SortCol = 'artist' | 'title' | 'album' | 'bpm' | 'duration' | 'genre' | 'stems';
+type SortCol = 'artist' | 'title' | 'album' | 'bpm' | 'duration' | 'genre' | 'stems' | 'dateAdded';
 
 // Demo rows for visual development (?demo) — no DB/IPC needed.
 const DEMO_TRACKS: LibTrack[] = (
@@ -66,6 +69,7 @@ const DEMO_TRACKS: LibTrack[] = (
   rating: 0,
   timesPlayed: 0,
   filetype: 'flac',
+  dateAdded: '2026-01-01 12:00:00',
   stemPath: null,
   stemsGeneratedAt: 0,
 }));
@@ -96,7 +100,8 @@ export function Library(): React.JSX.Element {
   const [sortDesc, setSortDesc] = useState(false);
   const [scanning, setScanning] = useState<string | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
-  const { widths, onResizeStart, reset: resetColumns, didJustResize } = useColumns();
+  const { widths, visible, toggleColumn, onResizeStart, reset: resetColumns, didJustResize } =
+    useColumns();
 
   const [dbError, setDbError] = useState<string | null>(null);
 
@@ -482,10 +487,29 @@ export function Library(): React.JSX.Element {
     ],
   );
 
-  // Explicit table width = the two fixed utility cols (WAVE 124 + LOAD 72) + every resizable
-  // column's current width. Needed so table-layout:fixed honors the <col> widths (see table JSX).
+  // Only the user-enabled columns render (header right-click toggles them).
+  const visCols = COLUMNS.filter((c) => visible[c.id]);
+  // Explicit table width = the two fixed utility cols (WAVE 112 + LOAD 72) + every VISIBLE
+  // resizable column's width. Needed so table-layout:fixed honors the <col> widths.
   const FIXED_COLS_W = 112 + 72;
-  const tableWidth = FIXED_COLS_W + COLUMNS.reduce((sum, c) => sum + (widths[c.id] ?? 0), 0);
+  const tableWidth = FIXED_COLS_W + visCols.reduce((sum, c) => sum + (widths[c.id] ?? 0), 0);
+
+  // Header right-click → show/hide columns (Mixxx / rekordbox). Built from the full set so
+  // hidden ones can be turned back on.
+  const openHeaderMenu = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      setCtxMenu({
+        x: e.clientX,
+        y: e.clientY,
+        items: COLUMNS.map((c) => ({
+          label: `${visible[c.id] ? '✓ ' : '   '}${c.label}`,
+          onClick: () => toggleColumn(c.id),
+        })),
+      });
+    },
+    [visible, toggleColumn],
+  );
 
   const toggleSort = (col: SortCol) => {
     if (col === sortCol) {
@@ -599,15 +623,15 @@ export function Library(): React.JSX.Element {
         >
           <colgroup>
             <col className="col-wave" />
-            {COLUMNS.map((c) => (
+            {visCols.map((c) => (
               <col key={c.id} style={{ width: `${widths[c.id]}px` }} />
             ))}
             <col className="col-load" />
           </colgroup>
           <thead>
-            <tr>
+            <tr onContextMenu={openHeaderMenu} title="Right-click to show/hide columns">
               <th className="th-wave">WAVE</th>
-              {COLUMNS.map((c) => (
+              {visCols.map((c) => (
                 <th
                   key={c.id}
                   onClick={c.sort ? () => { if (!didJustResize()) toggleSort(c.sort!); } : undefined}
@@ -663,19 +687,29 @@ export function Library(): React.JSX.Element {
                     hasStems={!!t.stemPath}
                   />
                 </td>
-                <td>{t.artist}</td>
-                <td>{t.title}</td>
-                <td>{t.album}</td>
-                <td>{t.genre}</td>
-                <BpmCell bpm={t.bpm} onSet={(v) => void updateRowBpm(t.id, v)} />
-
-                <td className={`lib-key${keyCompatible(t.key) ? ' key-compatible' : ''}`}>
-                  {t.key ?? ''}
-                </td>
-                <td className="num">{fmtDur(t.duration)}</td>
-                <td className="stem-cell">
-                  <StemCell track={t} status={stemStatus} onGenerate={generateStems} />
-                </td>
+                {visible.artist && <td>{t.artist}</td>}
+                {visible.title && <td>{t.title}</td>}
+                {visible.album && <td>{t.album}</td>}
+                {visible.genre && <td>{t.genre}</td>}
+                {visible.bpm && <BpmCell bpm={t.bpm} onSet={(v) => void updateRowBpm(t.id, v)} />}
+                {visible.key && (
+                  <td className={`lib-key${keyCompatible(t.key) ? ' key-compatible' : ''}`}>
+                    {t.key ?? ''}
+                  </td>
+                )}
+                {visible.time && <td className="num">{fmtDur(t.duration)}</td>}
+                {visible.year && <td className="num">{t.year ?? ''}</td>}
+                {visible.added && (
+                  <td className="lib-added" title={t.dateAdded ?? ''}>{fmtAdded(t.dateAdded)}</td>
+                )}
+                {visible.path && (
+                  <td className="lib-path" title={t.location}>{t.location}</td>
+                )}
+                {visible.stems && (
+                  <td className="stem-cell">
+                    <StemCell track={t} status={stemStatus} onGenerate={generateStems} />
+                  </td>
+                )}
                 <td className="load-cells">
                   {Array.from({ length: NUM_DECKS }, (_, d) => (
                     <button
@@ -709,6 +743,18 @@ function fmtDur(s: number | null): string {
   const m = Math.floor(s / 60);
   const sec = Math.floor(s % 60);
   return `${m}:${sec.toString().padStart(2, '0')}`;
+}
+
+/** Compact added-date: "Jun 28" this year, "Jun 28 '25" otherwise. Input is a SQLite
+ *  datetime string ("2026-06-28 22:35:14"); parse the date part safely. */
+function fmtAdded(s: string | null): string {
+  if (!s) return '';
+  const [y, mo, d] = s.slice(0, 10).split('-').map(Number);
+  if (!y || !mo || !d) return '';
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const cur = new Date().getFullYear();
+  const base = `${MONTHS[mo - 1]} ${d}`;
+  return y === cur ? base : `${base} '${String(y).slice(2)}`;
 }
 
 /**

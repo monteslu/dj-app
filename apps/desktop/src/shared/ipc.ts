@@ -40,6 +40,8 @@ export interface LibTrack {
   firstBeatFrame: number;
   key: string | null;
   rating: number;
+  /** SQLite datetime string, e.g. "2026-06-28 22:35:14". */
+  dateAdded: string | null;
   timesPlayed: number;
   filetype: string | null;
   /** Path to the generated .stem.mp4, or null. Non-null = stems ready. */
