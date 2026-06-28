@@ -12,6 +12,7 @@ import {
   DEFAULT_COLORS,
   unpackPeaks,
   unpackStemWaveforms,
+  STEM_COLORS,
   type PeakData,
 } from '@dj/waveform';
 import { computeStemWaveforms } from '../stem-thumbnail.js';
@@ -20,14 +21,8 @@ import { useDj } from '../dj-context.js';
 const W = 120;
 const H = 26;
 
-// Per-stem thumbnail colors + paint order (back → front), matching the deck lane:
-// NI-Stems index drums/bass/other/vocals; draw other → bass → drums → VOCALS (on top).
-const STEM_RGB: Array<[number, number, number]> = [
-  [255, 93, 93], // drums
-  [255, 210, 77], // bass
-  [93, 255, 158], // other
-  [93, 184, 255], // vocals
-];
+// Per-stem thumbnail colors from the canonical palette (matches the deck lane).
+const STEM_RGB: Array<[number, number, number]> = STEM_COLORS.map((s) => [...s.rgb]);
 const STEM_DRAW_ORDER = [2, 1, 0, 3]; // other, bass, drums, vocals(last/on top)
 
 // process-wide cache: trackId → rendered data URL (or '' = no waveform yet)

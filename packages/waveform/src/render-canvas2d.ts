@@ -6,6 +6,7 @@
  */
 
 import type { PeakData } from './peaks.js';
+import { STEM_COLORS } from './stem-colors.js';
 
 /** A point marker (hotcue, main cue) at a track fraction 0..1. */
 export interface Marker {
@@ -31,6 +32,16 @@ export interface WaveformColors {
   playhead: string;
   /** Center axis line. */
   axis: string;
+  /** Beat tick (white-ish lines). */
+  beat?: string;
+  /** Measure / downbeat marker (red-ish). */
+  measure?: string;
+  /** Active loop region fill. */
+  loopActive?: string;
+  /** Inactive loop region fill. */
+  loopInactive?: string;
+  /** Deepest stop of the scrolling-wave background gradient. */
+  bgDeep?: string;
 }
 
 export const DEFAULT_COLORS: WaveformColors = {
@@ -39,6 +50,10 @@ export const DEFAULT_COLORS: WaveformColors = {
   played: '#1d5e80',
   playhead: '#ff5a5a',
   axis: '#2a2e38',
+  beat: 'rgba(255,255,255,0.4)',
+  measure: 'rgba(255,60,60,0.85)',
+  loopActive: 'rgba(74,222,128,0.18)',
+  loopInactive: 'rgba(125,134,150,0.12)',
 };
 
 /**
@@ -103,7 +118,7 @@ export function drawOverview(
   if (overlay?.loop && overlay.loop.end > overlay.loop.start) {
     const x0 = overlay.loop.start * w;
     const x1 = overlay.loop.end * w;
-    ctx.fillStyle = overlay.loop.active ? 'rgba(74,222,128,0.18)' : 'rgba(125,134,150,0.12)';
+    ctx.fillStyle = overlay.loop.active ? (colors.loopActive ?? 'rgba(74,222,128,0.18)') : (colors.loopInactive ?? 'rgba(125,134,150,0.12)');
     ctx.fillRect(x0, 0, x1 - x0, h);
   }
 
@@ -129,9 +144,8 @@ export function drawOverview(
   ctx.stroke();
 }
 
-/** Per-stem overview colors (NI-Stems order drums/bass/other/vocals) — matches the top
- * scrolling lane + the StemRow mixer so the deck strip reads the same by eye. */
-const STEM_OVERVIEW_COLORS = ['255,93,93', '255,210,77', '93,255,158', '93,184,255'];
+/** Per-stem overview colors (csv "r,g,b") from the canonical stem palette. */
+const STEM_OVERVIEW_COLORS = STEM_COLORS.map((s) => s.csv);
 /** Back→front paint order so vocals sit on top (same as the top lane's STEM_Z). */
 const STEM_OVERVIEW_Z = [2, 1, 0, 3];
 
@@ -193,7 +207,7 @@ export function drawStemOverview(
   if (overlay?.loop && overlay.loop.end > overlay.loop.start) {
     const x0 = overlay.loop.start * w;
     const x1 = overlay.loop.end * w;
-    ctx.fillStyle = overlay.loop.active ? 'rgba(74,222,128,0.18)' : 'rgba(125,134,150,0.12)';
+    ctx.fillStyle = overlay.loop.active ? (colors.loopActive ?? 'rgba(74,222,128,0.18)') : (colors.loopInactive ?? 'rgba(125,134,150,0.12)');
     ctx.fillRect(x0, 0, x1 - x0, h);
   }
   if (overlay?.markers) {
@@ -327,7 +341,7 @@ export function drawScrolling(
   detail: PeakData,
   positionFrames: number,
   framesPerPx: number,
-  _colors: WaveformColors = DEFAULT_COLORS,
+  colors: WaveformColors = DEFAULT_COLORS,
   overlay?: ScrollOverlay,
 ): void {
   const ctx = canvas.getContext('2d') as
@@ -343,11 +357,12 @@ export function drawScrolling(
   const centerX = w / 2;
   const { peaks, framesPerBucket, length } = detail;
 
-  // background gradient
+  // background gradient (edges = background token, deeper center). Falls back to the
+  // original dark stops when the theme doesn't supply specific edge/deep colors.
   const bg = ctx.createLinearGradient(0, 0, 0, h);
-  bg.addColorStop(0, '#0c1018');
-  bg.addColorStop(0.5, '#06090e');
-  bg.addColorStop(1, '#0c1018');
+  bg.addColorStop(0, colors.background ?? '#0c1018');
+  bg.addColorStop(0.5, colors.bgDeep ?? '#06090e');
+  bg.addColorStop(1, colors.background ?? '#0c1018');
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, w, h);
 
@@ -369,11 +384,11 @@ export function drawScrolling(
       const down = !realDownbeats && ((n % 4) + 4) % 4 === 0;
       if (down) {
         // red measure marker (rekordbox / VirtualDJ convention)
-        ctx.fillStyle = 'rgba(255,60,60,0.85)';
+        ctx.fillStyle = colors.measure ?? 'rgba(255,60,60,0.85)';
         ctx.fillRect(x, 0, 2, h);
       } else {
         // brighter white beat ticks
-        ctx.fillStyle = 'rgba(255,255,255,0.4)';
+        ctx.fillStyle = colors.beat ?? 'rgba(255,255,255,0.4)';
         ctx.fillRect(x, 0, 1, h);
       }
       n++;
@@ -392,7 +407,7 @@ export function drawScrolling(
     const first = overlay.firstBeatFrame ?? 0;
     // bar phase = the first downbeat's beat number mod 4 (which beat starts the bar)
     const phase = ((Math.round((db[0]! - first) / fpb) % 4) + 4) % 4;
-    ctx.fillStyle = 'rgba(255,60,60,0.85)';
+    ctx.fillStyle = colors.measure ?? 'rgba(255,60,60,0.85)';
     // first visible measure beat-index ≥ leftFrame, on the every-4 grid at this phase
     const leftBeat = (leftFrame - first) / fpb;
     let n = phase + Math.ceil((leftBeat - phase) / 4) * 4;
@@ -486,6 +501,6 @@ export function drawScrolling(
   // center playhead — glowing line (drawn AFTER restore so it stays fixed/sharp)
   ctx.fillStyle = 'rgba(255,90,90,0.18)';
   ctx.fillRect(centerX - 2, 0, 4, h);
-  ctx.fillStyle = '#ff5a5a';
+  ctx.fillStyle = colors.playhead;
   ctx.fillRect(centerX - 0.5, 0, 1.5, h);
 }

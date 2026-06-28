@@ -20,6 +20,7 @@ import {
   type Group,
   type Key,
 } from '@dj/control-bus';
+import { STEM_COLORS } from '@dj/waveform';
 
 /** A single pad's spec for the current mode + deck. */
 export interface PadSpec {
@@ -49,14 +50,16 @@ export interface PadMode {
   available?: (bus: ControlBus, deckIndex: number) => boolean;
 }
 
-// Canonical stem order + colors (match StemRow + the waveform coloring so pad == wave ==
-// fader) + an icon per stem (stems are the primary identity → icon + name on the pad).
-const STEMS = [
-  { gain: DeckKeys.stemGain0, name: 'DRUMS', icon: '🥁', color: '#ff5d5d' },
-  { gain: DeckKeys.stemGain1, name: 'BASS', icon: '🎸', color: '#ffd24d' },
-  { gain: DeckKeys.stemGain2, name: 'OTHER', icon: '🎹', color: '#5dff9e' },
-  { gain: DeckKeys.stemGain3, name: 'VOCAL', icon: '🎤', color: '#5db8ff' },
-] as const;
+// Stem pads: name + color come from the canonical STEM_COLORS palette (so pad == wave ==
+// fader and a theme recolors all of them at once); gain key + icon are pad-specific.
+const STEM_GAINS = [DeckKeys.stemGain0, DeckKeys.stemGain1, DeckKeys.stemGain2, DeckKeys.stemGain3];
+const STEM_ICONS = ['🥁', '🎸', '🎹', '🎤'];
+const STEMS = STEM_COLORS.map((s, i) => ({
+  gain: STEM_GAINS[i]!,
+  name: s.name,
+  icon: STEM_ICONS[i]!,
+  color: s.hex,
+}));
 
 const muted = (bus: ControlBus, g: Group, key: Key) => bus.get(g, key) <= 0.001;
 

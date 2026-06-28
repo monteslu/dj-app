@@ -28,4 +28,4 @@ export {
   type ScrollOverlay,
   type StemBand,
 } from './render-canvas2d.js';
-// GPU scrolling-waveform renderer (the live, per-frame path).
+export { STEM_COLORS, type StemColor } from './stem-colors.js';

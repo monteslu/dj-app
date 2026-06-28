@@ -5,7 +5,8 @@
  * position). The component is a thin shell that mounts a canvas + handles seek.
  */
 
-import { drawOverview, drawStemOverview, DEFAULT_COLORS } from '@dj/waveform';
+import { drawOverview, drawStemOverview } from '@dj/waveform';
+import { themedWaveformColors } from './waveform-theme.js';
 import {
   deck as deckGroup,
   DeckKeys,
@@ -70,10 +71,10 @@ export class OverviewStripController {
         this.bus.get(this.group, DeckKeys.stemGain2),
         this.bus.get(this.group, DeckKeys.stemGain3),
       ];
-      drawStemOverview(c, st.stemOverviewPeaks, gains, fraction, DEFAULT_COLORS, { markers });
+      drawStemOverview(c, st.stemOverviewPeaks, gains, fraction, themedWaveformColors(), { markers });
     } else if (st.peaks && frames > 0) {
       const markers = collectHotcueMarkers(this.bus, this.group, frames);
-      drawOverview(c, st.peaks.overview, fraction, DEFAULT_COLORS, { markers });
+      drawOverview(c, st.peaks.overview, fraction, themedWaveformColors(), { markers });
     } else {
       const ctx = c.getContext('2d');
       if (ctx) {

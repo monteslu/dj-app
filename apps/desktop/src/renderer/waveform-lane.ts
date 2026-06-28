@@ -5,7 +5,8 @@
  * here. Pure logic, no JSX.
  */
 
-import { drawScrolling, DEFAULT_COLORS } from '@dj/waveform';
+import { drawScrolling, STEM_COLORS } from '@dj/waveform';
+import { themedWaveformColors } from './waveform-theme.js';
 import { deck as deckGroup, DeckKeys, MASTER, MasterKeys, type ControlBus } from '@dj/control-bus';
 import { getDeckTrack } from './deck-state.js';
 import { reportLaneDraw } from './perf-monitor.js';
@@ -13,14 +14,9 @@ import { onFrame } from './frame-loop.js';
 
 const SR = 48000;
 
-// Per-stem waveform colors + their gain keys (NI-Stems order: drums/bass/other/
-// vocals). Must match the StemRow mixer colors so fader ↔ wave map by eye.
-const STEM_WAVE_COLORS: Array<[number, number, number]> = [
-  [255, 93, 93], // drums
-  [255, 210, 77], // bass
-  [93, 255, 158], // other
-  [93, 184, 255], // vocals
-];
+// Per-stem waveform colors from the canonical palette (so wave == pad == fader; a theme
+// recolors all at once). [r,g,b] tuples, NI-Stems order drums/bass/other/vocals.
+const STEM_WAVE_COLORS: Array<[number, number, number]> = STEM_COLORS.map((s) => [...s.rgb]);
 const STEM_GAIN_KEYS = [
   DeckKeys.stemGain0,
   DeckKeys.stemGain1,
@@ -150,7 +146,7 @@ export class WaveformLaneController {
         : undefined;
 
     const t0 = performance.now();
-    drawScrolling(this.canvas, st.peaks.detail, positionFrames, framesPerPx, DEFAULT_COLORS, {
+    drawScrolling(this.canvas, st.peaks.detail, positionFrames, framesPerPx, themedWaveformColors(), {
       firstBeatFrame: fbf >= 0 ? fbf : 0,
       framesPerBeat,
       downbeatFrames: st.downbeatFrames ?? undefined,

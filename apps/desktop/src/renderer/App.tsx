@@ -16,6 +16,7 @@ import { TempoFader } from './components/Faders.js';
 import { WaveformBand } from './components/WaveformBand.js';
 import { startConsoleResize, clearConsoleHeight, applyConsoleHeight } from './panel-sizes.js';
 import { isDemo, seedDemo } from './demo.js';
+import { useTheme } from './theme.js';
 
 /**
  * Splitter — drag to resize the console (decks) vs library split. Writes the
@@ -81,6 +82,7 @@ function RecordButton(): React.JSX.Element {
 function Stage(): React.JSX.Element {
   const { started, bus } = useDj();
   const [showPrefs, setShowPrefs] = useState(false);
+  const [themeId] = useTheme();
 
   // Restore the persisted splitter size on mount.
   useEffect(() => {
@@ -97,7 +99,7 @@ function Stage(): React.JSX.Element {
   }, [bus]);
 
   return (
-    <div className="app">
+    <div className="app" data-theme={themeId}>
       <div className="titlebar">
         <span className="brand">dj-app</span>
         <span className="tagline">built for the love of it</span>
