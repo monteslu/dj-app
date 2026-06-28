@@ -88,7 +88,7 @@ export class WaveformLaneController {
     if (!st.peaks) {
       const ctx = this.canvas.getContext('2d');
       if (ctx) {
-        ctx.fillStyle = '#0a0d13';
+        ctx.fillStyle = themedWaveformColors().background;
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
       }
       return;

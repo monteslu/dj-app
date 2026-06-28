@@ -78,7 +78,7 @@ export class OverviewStripController {
     } else {
       const ctx = c.getContext('2d');
       if (ctx) {
-        ctx.fillStyle = '#0b0e14';
+        ctx.fillStyle = themedWaveformColors().background;
         ctx.fillRect(0, 0, c.width, c.height);
       }
     }

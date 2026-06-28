@@ -110,8 +110,8 @@ export function Knob({ group, ckey, label, min, max, center, big, hint }: Props)
       >
         <defs>
           <radialGradient id="knobgrad" cx="38%" cy="30%" r="75%">
-            <stop offset="0%" stopColor="#3a4458" />
-            <stop offset="100%" stopColor="#1a2030" />
+            <stop offset="0%" stopColor="var(--panel-3)" />
+            <stop offset="100%" stopColor="var(--panel)" />
           </radialGradient>
         </defs>
         <circle cx={C} cy={C} r={R + 2} className="knob-rim" />
