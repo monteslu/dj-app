@@ -32,7 +32,7 @@ const root = document.getElementById('root');
 if (!root) throw new Error('no #root element');
 
 if (!('gpu' in navigator)) {
-  console.warn('[dj-app web] WebGPU unavailable in this browser');
+  console.warn('[MochaMix web] WebGPU unavailable in this browser');
 }
 
 // NOTE: no StrictMode here — its double-mount disposes+recreates the WebGL lane

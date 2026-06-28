@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "The dj-app Electron app.",
+  "description": "The MochaMix Electron app.",
   "main": "dist-main/main.js",
   "scripts": {
     "build:renderer": "vite build",

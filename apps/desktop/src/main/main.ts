@@ -37,7 +37,7 @@ const isDev = process.argv.includes('--dev');
 // Electron/Chromium actually ran (stale binaries vs the upgraded one are otherwise
 // indistinguishable in the logs).
 console.log(
-  `[dj-app] electron ${process.versions.electron} | chromium ${process.versions.chrome} | node ${process.versions.node}`,
+  `[MochaMix] electron ${process.versions.electron} | chromium ${process.versions.chrome} | node ${process.versions.node}`,
 );
 
 // Set a clean app name BEFORE any getPath('userData') call. The package name is

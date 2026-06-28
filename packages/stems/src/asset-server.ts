@@ -52,11 +52,22 @@ export function mimeFor(name: string): string {
   return MIME[ext] ?? 'application/octet-stream';
 }
 
-function cacheDir(): string {
+function cacheBase(): string {
   const plat = platform();
-  if (plat === 'darwin') return join(homedir(), 'Library', 'Application Support', 'dj-app', 'webgpu');
-  if (plat === 'win32') return join(homedir(), 'AppData', 'Local', 'dj-app', 'webgpu');
-  return join(homedir(), '.cache', 'dj-app', 'webgpu');
+  if (plat === 'darwin') return join(homedir(), 'Library', 'Application Support');
+  if (plat === 'win32') return join(homedir(), 'AppData', 'Local');
+  return join(homedir(), '.cache');
+}
+
+function cacheDir(): string {
+  const base = cacheBase();
+  const current = join(base, 'mochamix', 'webgpu');
+  // Reuse the pre-rename 'dj-app' cache if it exists (these are large downloaded models —
+  // don't force a re-download just because the app was renamed). Otherwise use the new dir.
+  const legacy = join(base, 'dj-app', 'webgpu');
+  if (existsSync(current)) return current;
+  if (existsSync(legacy)) return legacy;
+  return current;
 }
 
 function download(url: string, destPath: string, redirects = 5): Promise<void> {

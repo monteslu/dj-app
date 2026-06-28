@@ -1,6 +1,7 @@
-# dj-app
+# MochaMix
 
-A Mixxx-class DJ application built in Electron + Web Audio + WASM + WebGPU.
+A Mixxx-class, open-source DJ application built in Electron + Web Audio + WASM + WebGPU.
+Modern, stem-native performance workflow (like VirtualDJ) with the freedom of open source, and free.
 Built for the love of it.
 
 ## Status
@@ -28,8 +29,8 @@ The real-time sample resampler and the BPM detector run in **WASM+SIMD**, not JS
 ### Clone and run (any computer)
 
 ```bash
-git clone git@github.com:monteslu/dj-app.git
-cd dj-app
+git clone git@github.com:monteslu/mochamix.git
+cd mochamix
 npm install            # installs all workspaces (+ self-heals the Electron binary)
 npm run dev            # build renderer/worklet/main → launch
 ```

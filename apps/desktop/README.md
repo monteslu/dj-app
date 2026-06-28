@@ -1,10 +1,10 @@
-# @internal-dj/desktop
+# MochaMix desktop
 
-The internal-dj Electron app. Two decks + a center mixer, bound to the control bus.
+The MochaMix Electron app. Two decks + a center mixer, bound to the control bus.
 
 ## Run it
 
-From the **repo root** (`dj-app/`):
+From the **repo root** (`mochamix/`):
 
 ```bash
 npm install            # installs all workspaces; a postinstall repairs Electron (see below)
