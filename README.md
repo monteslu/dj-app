@@ -2,7 +2,7 @@
 
 A Mixxx-class, open-source DJ application built in Electron + Web Audio + WASM + WebGPU.
 Modern, stem-native performance workflow (like VirtualDJ) with the freedom of open source, and free.
-Built for the love of it.
+Proof you can build just about anything with web tech.
 
 ![MochaMix — two decks with live stem pads, beatgrids, EQ/crossfader, and a searchable library](https://raw.githubusercontent.com/monteslu/mochamix/main/mochamix_screenshot.png)
 

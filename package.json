@@ -2,7 +2,7 @@
   "name": "mochamix",
   "version": "0.0.0",
   "private": true,
-  "description": "A Mixxx-class DJ application built in Electron. Built for the love of it.",
+  "description": "A Mixxx-class DJ application built in Electron. Proof you can build just about anything with web tech.",
   "type": "module",
   "workspaces": [
     "packages/*",
