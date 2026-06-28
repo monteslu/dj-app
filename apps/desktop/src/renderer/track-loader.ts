@@ -360,6 +360,20 @@ async function loadStemFile(
     if (m.firstBeatFrame != null && m.firstBeatFrame >= 0) {
       bus.set(g, DeckKeys.firstBeatFrame, m.firstBeatFrame);
     }
+    // Load cached downbeats (real measure markers from DownBeat) — the NORMAL path does
+    // this; the stem path didn't, so a stem deck drew SYNTHETIC measures (every 4 beats
+    // from firstBeatFrame) while a non-stem deck drew REAL ones → their measure markers
+    // didn't line up even when the beat grids were snapped. Now both use real downbeats.
+    if (src.libraryId != null) {
+      void window.dj.libraryDownbeats(src.libraryId).then((blob) => {
+        if (blob && blob.length >= 4) {
+          const u = new Uint8Array(blob);
+          setDeckTrack(deckIndex, {
+            downbeatFrames: new Int32Array(u.buffer, u.byteOffset, u.byteLength >> 2),
+          });
+        }
+      });
+    }
 
     // Background BPM/grid analysis if unknown (bpm OR phase missing), so sync/smart-fader
     // work even for an unanalyzed stem file. Analyze the SUMMED stems (= the mix) — no
@@ -369,10 +383,18 @@ async function loadStemFile(
         if (r.bpm > 0) {
           bus.set(g, DeckKeys.fileBpm, r.bpm);
           bus.set(g, DeckKeys.firstBeatFrame, r.firstBeatFrame);
+          // Show + persist the REAL measure markers (DJs align by eye to the downbeat),
+          // so a freshly-analyzed stem deck's measures match a non-stem deck's.
+          if (r.downbeatFrames && r.downbeatFrames.length > 0) {
+            setDeckTrack(deckIndex, { downbeatFrames: r.downbeatFrames });
+          }
           if (src.libraryId != null) {
             void window.dj.librarySetAnalysis(src.libraryId, {
               bpm: r.bpm,
               firstBeatFrame: r.firstBeatFrame,
+              downbeats: r.downbeatFrames
+                ? new Uint8Array(r.downbeatFrames.buffer, r.downbeatFrames.byteOffset, r.downbeatFrames.byteLength)
+                : undefined,
             });
           }
         }
