@@ -85,6 +85,22 @@ function buildRuntime(): {
   });
   bus.defineAll(standardControls(NUM_DECKS));
 
+  // Diagnostic: log what persisted across restart, so a "my toggle didn't stick" report
+  // is self-evidencing (was it absent from storage = write bug, or present but the deck
+  // shows it off = a display/apply bug). Keylock + smart fader are the usual suspects.
+  try {
+    const keys = Object.keys(persisted);
+    console.log(
+      `[persist] restored ${keys.length} control(s) from localStorage` +
+        (keys.length
+          ? ` — keylock=${persisted['[Channel1],keylock'] ?? '·'}/${persisted['[Channel2],keylock'] ?? '·'}` +
+            ` smart_fader=${persisted['[Master],smart_fader_enabled'] ?? '·'}`
+          : ' (none — first run or storage was cleared)'),
+    );
+  } catch {
+    /* logging only */
+  }
+
   // The worklet is built separately (vite.worklet.config.ts) to a stable path
   // next to index.html, because Vite's asset handling can't bundle a .ts worklet.
   // Resolve it relative to the current document so file:// loading works.
