@@ -129,6 +129,92 @@ export function drawOverview(
   ctx.stroke();
 }
 
+/** Per-stem overview colors (NI-Stems order drums/bass/other/vocals) — matches the top
+ * scrolling lane + the StemRow mixer so the deck strip reads the same by eye. */
+const STEM_OVERVIEW_COLORS = ['255,93,93', '255,210,77', '93,255,158', '93,184,255'];
+/** Back→front paint order so vocals sit on top (same as the top lane's STEM_Z). */
+const STEM_OVERVIEW_Z = [2, 1, 0, 3];
+
+/**
+ * Stem-aware overview: the deck's full-song strip colored by stem (like the top lane),
+ * each stem dimmed by its live gain so a muted stem fades out. `stems` is the 4 per-stem
+ * overview PeakData (drums/bass/other/vocals); `gains` the live 0..1 stem gains.
+ */
+export function drawStemOverview(
+  canvas: HTMLCanvasElement | OffscreenCanvas,
+  stems: PeakData[],
+  gains: number[],
+  positionFraction: number,
+  colors: WaveformColors = DEFAULT_COLORS,
+  overlay?: Overlay,
+): void {
+  const ctx = canvas.getContext('2d') as
+    | CanvasRenderingContext2D
+    | OffscreenCanvasRenderingContext2D
+    | null;
+  if (!ctx || stems.length === 0) return;
+  const w = canvas.width;
+  const h = canvas.height;
+  const mid = h / 2;
+
+  ctx.fillStyle = colors.background;
+  ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = colors.axis;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, mid);
+  ctx.lineTo(w, mid);
+  ctx.stroke();
+
+  const playedX = Math.round(positionFraction * w);
+  // Paint each stem back→front; a low live gain dims (fades) that stem's wave.
+  for (const si of STEM_OVERVIEW_Z) {
+    const p = stems[si];
+    if (!p) continue;
+    const gain = gains[si] ?? 1;
+    if (gain <= 0.001) continue; // muted → don't paint
+    const n = p.length;
+    const rgb = STEM_OVERVIEW_COLORS[si]!;
+    for (let x = 0; x < w; x++) {
+      const b = Math.min(n - 1, Math.floor((x / w) * n));
+      const amp = (p.peaks[b]! / 255) * mid;
+      if (amp < 0.5) continue;
+      // dim by gain; further dim the already-played portion
+      const a = gain * (x <= playedX ? 0.55 : 1);
+      ctx.strokeStyle = `rgba(${rgb},${a.toFixed(3)})`;
+      ctx.beginPath();
+      ctx.moveTo(x + 0.5, mid - amp);
+      ctx.lineTo(x + 0.5, mid + amp);
+      ctx.stroke();
+    }
+  }
+
+  // loop region + markers + playhead (shared with drawOverview)
+  if (overlay?.loop && overlay.loop.end > overlay.loop.start) {
+    const x0 = overlay.loop.start * w;
+    const x1 = overlay.loop.end * w;
+    ctx.fillStyle = overlay.loop.active ? 'rgba(74,222,128,0.18)' : 'rgba(125,134,150,0.12)';
+    ctx.fillRect(x0, 0, x1 - x0, h);
+  }
+  if (overlay?.markers) {
+    for (const m of overlay.markers) {
+      const mx = Math.round(m.fraction * w);
+      ctx.strokeStyle = m.color;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(mx + 0.5, 0);
+      ctx.lineTo(mx + 0.5, h);
+      ctx.stroke();
+    }
+  }
+  ctx.strokeStyle = colors.playhead;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(playedX + 0.5, 0);
+  ctx.lineTo(playedX + 0.5, h);
+  ctx.stroke();
+}
+
 /**
  * Draw the zoomed scrolling waveform centered on the play position. `framesPerPx`
  * controls zoom (source frames per canvas pixel). The playhead sits at canvas

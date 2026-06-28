@@ -18,6 +18,7 @@ export {
 } from './peaks.js';
 export {
   drawOverview,
+  drawStemOverview,
   drawScrolling,
   DEFAULT_COLORS,
   type WaveformColors,

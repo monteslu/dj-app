@@ -150,6 +150,7 @@ export async function loadTrackToDeck(
   setDeckTrack(deckIndex, {
     peaks,
     stemPeaks: null, // a normal track clears any prior stem-deck coloring
+    stemOverviewPeaks: null,
     stemScales: null,
     downbeatFrames: null, // cleared; loaded from DB below if analyzed
     title,
@@ -283,13 +284,16 @@ async function loadStemFile(
     const detailBuckets = detailBucketsForDuration(dur);
     const peaks = computePeakSet(ch, mixDecoded.frames, detailBuckets, mixDecoded.sampleRate);
 
-    // Per-stem detail peaks so the waveform colors each stem (the mashup view).
-    const stemPeaks = stems.map((s) => {
+    // Per-stem peaks (detail for the top scrolling lane, overview for the deck strip) so
+    // BOTH waveforms can color each stem (the mashup view).
+    const stemSets = stems.map((s) => {
       const sAll = new Float32Array(s.sampleBuffer);
       const sCh: Float32Array[] = [];
       for (let c = 0; c < s.channels; c++) sCh.push(sAll.subarray(c * s.frames, (c + 1) * s.frames));
-      return computePeakSet(sCh, s.frames, detailBuckets, s.sampleRate).detail;
+      return computePeakSet(sCh, s.frames, detailBuckets, s.sampleRate);
     });
+    const stemPeaks = stemSets.map((p) => p.detail);
+    const stemOverviewPeaks = stemSets.map((p) => p.overview);
     // Normalize all stems by ONE shared max (the loudest stem), like Mixxx
     // (waveformrendererstem: height / m_maxValue with a single m_maxValue). The
     // loudest stem fills the lane; quieter stems stay proportionally shorter, so the
@@ -307,6 +311,7 @@ async function loadStemFile(
     setDeckTrack(deckIndex, {
       peaks,
       stemPeaks,
+      stemOverviewPeaks,
       stemScales,
       title: m.title ?? src.file.name.replace(/\.[^.]+$/, ''),
       artist: m.artist ?? null,

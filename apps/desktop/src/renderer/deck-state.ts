@@ -11,8 +11,10 @@ import type { PeakData } from '@dj/waveform';
 export interface DeckTrackState {
   peaks: { detail: PeakData; overview: PeakData } | null;
   /** Per-stem detail peaks (drums/bass/other/vocals) when this is a stem deck — the
-   *  waveform colors each stem. Same bucketing as `peaks.detail`. null = not stems. */
+   *  TOP scrolling waveform colors each stem. Same bucketing as `peaks.detail`. null = not stems. */
   stemPeaks: PeakData[] | null;
+  /** Per-stem OVERVIEW peaks (same order) for the deck's full-song strip to color stems. */
+  stemOverviewPeaks: PeakData[] | null;
   /** Stem waveform scale (shared ≈255/loudest-stem-max, Mixxx-style) per stem. */
   stemScales: number[] | null;
   /** Real downbeat (bar-start) frames from DownBeat, for true measure markers. */
@@ -32,6 +34,7 @@ export interface DeckTrackState {
 const empty: DeckTrackState = {
   peaks: null,
   stemPeaks: null,
+  stemOverviewPeaks: null,
   stemScales: null,
   downbeatFrames: null,
   title: null,
