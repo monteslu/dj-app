@@ -243,10 +243,10 @@ export async function loadTrackToDeck(
 }
 
 /**
- * Load a .stem.mp4 as a stem deck: extract its 4 stem tracks (drums/bass/other/
- * vocals — track 0 is the mixdown, skipped), decode each, and hand them to the
- * engine for independent per-stem mixing. Peaks/waveform come from the mixdown
- * (track 0). Returns true on success, false to fall back to normal playback.
+ * Load a .stem.mp4 as a stem deck: extract + decode its 4 stem tracks (drums/bass/other/
+ * vocals); track 0 (the mixdown) is NOT decoded — we play the stems and derive the mix
+ * waveform + BPM input by summing them. Hands the 4 stems to the engine for independent
+ * mixing. Returns true on success, false to fall back to normal playback.
  */
 async function loadStemFile(
   deps: TrackLoaderDeps,
@@ -261,45 +261,56 @@ async function loadStemFile(
   const sizeMB = src.file.data.byteLength / 1048576;
   try {
     const tracks = extractAllTracks(new Uint8Array(src.file.data));
-    // STEMS-4 layout: [mixdown, drums, bass, other, vocals]. Need all 5.
+    // STEMS-4 layout: [mixdown, drums, bass, other, vocals]. We DON'T decode track 0 (the
+    // mixdown) — the 4 stems sum to it (NI Stems are gain-1 separations of the master), so
+    // we derive the mix from the stems we already decode. Saves a whole decode + stream.
     if (tracks.length < 5) return false;
     const tDemux = performance.now();
-    const mixdown = tracks[0]!;
     const stemBytes = tracks.slice(1, 5);
 
-    // Decode the 4 stems (each a standalone AAC m4a) to planar Float32.
+    // Decode the 4 stems in parallel → planar Float32.
     const stems = await Promise.all(
       stemBytes.map((b) => {
         const ab = b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
         return decodeArrayBuffer(ctx, ab, 'stem.m4a');
       }),
     );
-
-    // Waveform peaks from the mixdown (what the DJ sees on the lane).
-    const mixAb = mixdown.buffer.slice(
-      mixdown.byteOffset,
-      mixdown.byteOffset + mixdown.byteLength,
-    ) as ArrayBuffer;
-    const mixDecoded = await decodeArrayBuffer(ctx, mixAb, 'mixdown.m4a');
     const tDecode = performance.now();
-    const all = new Float32Array(mixDecoded.sampleBuffer);
-    const ch: Float32Array[] = [];
-    for (let c = 0; c < mixDecoded.channels; c++) {
-      ch.push(all.subarray(c * mixDecoded.frames, (c + 1) * mixDecoded.frames));
+
+    // Per-stem planar channels (sub-views of each decoded buffer).
+    const stemChans = stems.map((s) => {
+      const sAll = new Float32Array(s.sampleBuffer);
+      const sCh: Float32Array[] = [];
+      for (let c = 0; c < s.channels; c++) sCh.push(sAll.subarray(c * s.frames, (c + 1) * s.frames));
+      return sCh;
+    });
+
+    // The "mixdown" = sum of the 4 stems. Build a stereo mix (sum each channel) for the
+    // mix waveform + BPM analysis, instead of decoding the redundant mixdown track.
+    const frames = Math.max(...stems.map((s) => s.frames));
+    const sampleRate = stems[0]!.sampleRate;
+    const mixL = new Float32Array(frames);
+    const mixR = new Float32Array(frames);
+    for (const sc of stemChans) {
+      const l = sc[0]!;
+      const r = sc[1] ?? sc[0]!;
+      const n = Math.min(frames, l.length);
+      for (let i = 0; i < n; i++) {
+        mixL[i]! += l[i]!;
+        mixR[i]! += r[i]!;
+      }
     }
-    const dur = mixDecoded.frames / mixDecoded.sampleRate;
+    const ch = [mixL, mixR];
+    const dur = frames / sampleRate;
     const detailBuckets = detailBucketsForDuration(dur);
 
-    // Mixdown + per-stem peaks, all computed IN THE WORKER POOL in parallel (6 passes fan
-    // out across workers instead of blocking the main thread one after another).
+    // Mix + per-stem peaks, all computed IN THE WORKER POOL in parallel (fan out across
+    // workers instead of blocking the main thread).
     const [peaks, ...stemSets] = await Promise.all([
-      peaksInWorker(analysis, ch, mixDecoded.frames, detailBuckets, mixDecoded.sampleRate),
-      ...stems.map((s) => {
-        const sAll = new Float32Array(s.sampleBuffer);
-        const sCh: Float32Array[] = [];
-        for (let c = 0; c < s.channels; c++) sCh.push(sAll.subarray(c * s.frames, (c + 1) * s.frames));
-        return peaksInWorker(analysis, sCh, s.frames, detailBuckets, s.sampleRate);
-      }),
+      peaksInWorker(analysis, ch, frames, detailBuckets, sampleRate),
+      ...stemChans.map((sCh, i) =>
+        peaksInWorker(analysis, sCh, stems[i]!.frames, detailBuckets, stems[i]!.sampleRate),
+      ),
     ]);
     const stemPeaks = stemSets.map((p) => p.detail);
     const stemOverviewPeaks = stemSets.map((p) => p.overview);
@@ -332,13 +343,14 @@ async function loadStemFile(
 
     engine.loadStems(deckIndex, stems, { bpm: m.bpm });
     const g = deckGroup(deckIndex + 1);
-    // Stem track is ready — clear the spinner + log where the (heavier) stem load went:
-    // demux the 5 streams, decode 5 (4 stems + mixdown), 5 peak passes, engine upload.
+    // Stem track is ready — clear the spinner + log where the load went. We decode only
+    // the 4 stems (NOT the mixdown — we play + sum the stems), and peak the 4 stems + the
+    // summed mix in the worker pool.
     bus.set(g, DeckKeys.loading, 0);
     console.log(
       `[load] deck ${deckIndex + 1} STEMS "${src.file.name}" ${sizeMB.toFixed(1)}MB ${dur.toFixed(0)}s ` +
         `in ${(performance.now() - t0).toFixed(0)}ms — demux ${(tDemux - t0).toFixed(0)}ms, ` +
-        `decode(5) ${(tDecode - tDemux).toFixed(0)}ms, peaks(5) ${(tPeaks - tDecode).toFixed(0)}ms, ` +
+        `decode(4) ${(tDecode - tDemux).toFixed(0)}ms, peaks(5) ${(tPeaks - tDecode).toFixed(0)}ms, ` +
         `engine ${(performance.now() - tPeaks).toFixed(0)}ms`,
     );
     if (m.bpm && m.bpm > 0) bus.set(g, DeckKeys.fileBpm, m.bpm);
@@ -349,10 +361,11 @@ async function loadStemFile(
       bus.set(g, DeckKeys.firstBeatFrame, m.firstBeatFrame);
     }
 
-    // Background analysis of the mixdown if the grid is unknown (bpm OR phase missing),
-    // so sync/smart-fader work even for an unanalyzed stem file.
+    // Background BPM/grid analysis if unknown (bpm OR phase missing), so sync/smart-fader
+    // work even for an unanalyzed stem file. Analyze the SUMMED stems (= the mix) — no
+    // mixdown decode needed; we already have the stems.
     if (!m.bpm || m.bpm <= 0 || m.firstBeatFrame == null || m.firstBeatFrame < 0) {
-      void analysis.analyze(analysisFromDecoded(mixDecoded)).then((r) => {
+      void analysis.analyze({ mono: downmixMono(ch, frames), frames, sampleRate }).then((r) => {
         if (r.bpm > 0) {
           bus.set(g, DeckKeys.fileBpm, r.bpm);
           bus.set(g, DeckKeys.firstBeatFrame, r.firstBeatFrame);
