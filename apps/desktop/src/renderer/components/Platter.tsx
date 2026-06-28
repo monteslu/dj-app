@@ -6,7 +6,8 @@
  */
 
 import { useEffect, useRef } from 'react';
-import { useDj } from '../dj-context.js';
+import { deck as deckGroup, DeckKeys } from '@dj/control-bus';
+import { useDj, useControlValue } from '../dj-context.js';
 import { PlatterController } from '../platter-controller.js';
 
 // Thin shell: render the disc/ring, hand them to the controller (rotation +
@@ -21,6 +22,7 @@ export function Platter({
   const { bus } = useDj();
   const discRef = useRef<HTMLDivElement>(null);
   const ringRef = useRef<SVGCircleElement>(null);
+  const loading = useControlValue(deckGroup(deckIndex + 1), DeckKeys.loading) > 0.5;
 
   useEffect(() => {
     if (!discRef.current) return;
@@ -55,6 +57,11 @@ export function Platter({
         )}
         <div className="platter-marker" />
       </div>
+      {loading && (
+        <div className="platter-loading" aria-label="Loading track">
+          <div className="spin" />
+        </div>
+      )}
     </div>
   );
 }

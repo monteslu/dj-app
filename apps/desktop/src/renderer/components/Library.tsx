@@ -232,8 +232,18 @@ export function Library(): React.JSX.Element {
       if (!started) {
         await start();
       }
+      // Show the spinner immediately (covers the IPC byte-read too), and time the read —
+      // for a big lossless file this can be a large slice of the multi-second load.
+      bus.set(deckGroup(deckIndex + 1), DeckKeys.loading, 1);
+      const tRead = performance.now();
       const file = await window.dj.readTrackById(track.id);
-      if (!file) return;
+      console.log(
+        `[load] deck ${deckIndex + 1} read bytes in ${(performance.now() - tRead).toFixed(0)}ms`,
+      );
+      if (!file) {
+        bus.set(deckGroup(deckIndex + 1), DeckKeys.loading, 0);
+        return;
+      }
       await loadTrackToDeck({ engine, bus, analysis }, deckIndex, {
         file,
         meta: {

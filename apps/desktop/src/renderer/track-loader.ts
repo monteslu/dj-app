@@ -91,15 +91,25 @@ export async function loadTrackToDeck(
   const ctx = engine.audioContext;
   if (!ctx) return; // engine not started
 
+  // Mark the deck as loading so the UI shows a spinner; cleared after engine.loadTrack.
+  const lg = deckGroup(deckIndex + 1);
+  bus.set(lg, DeckKeys.loading, 1);
+  const t0 = performance.now();
+  const sizeMB = src.file.data.byteLength / 1048576;
+
   // Stem deck: a .stem.mp4 holds the mixdown + 4 separable stems. Decode the 4 stems
   // and load them as a stem deck (independent per-stem gain → live mashups).
   if (src.file.isStem) {
     const loaded = await loadStemFile(deps, deckIndex, src);
-    if (loaded) return;
+    if (loaded) {
+      bus.set(lg, DeckKeys.loading, 0);
+      return;
+    }
     // If stem extraction failed, fall through to play it as a normal mixed track.
   }
 
   const decoded = await decodeArrayBuffer(ctx, src.file.data, src.file.name);
+  const tDecodeDone = performance.now();
 
   // planar channels → peak set
   const all = new Float32Array(decoded.sampleBuffer);
@@ -114,6 +124,7 @@ export async function loadTrackToDeck(
     detailBucketsForDuration(dur),
     decoded.sampleRate,
   );
+  const tPeaksDone = performance.now();
 
   // Merge stored library metadata (from readTrackById) under any explicit meta the
   // caller passed — so EVERY load path (library double-click, drag-drop, deck button)
@@ -134,7 +145,15 @@ export async function loadTrackToDeck(
   });
 
   engine.loadTrack(deckIndex, decoded);
+  const tEngineDone = performance.now();
   const g = deckGroup(deckIndex + 1);
+  // The audible track is ready — clear the spinner + log where the load time went.
+  bus.set(g, DeckKeys.loading, 0);
+  console.log(
+    `[load] deck ${deckIndex + 1} "${src.file.name}" ${sizeMB.toFixed(1)}MB ${dur.toFixed(0)}s ` +
+      `in ${(tEngineDone - t0).toFixed(0)}ms — decode ${(tDecodeDone - t0).toFixed(0)}ms, ` +
+      `peaks ${(tPeaksDone - tDecodeDone).toFixed(0)}ms, engine ${(tEngineDone - tPeaksDone).toFixed(0)}ms`,
+  );
   if (m.bpm && m.bpm > 0) {
     bus.set(g, DeckKeys.fileBpm, m.bpm);
   }

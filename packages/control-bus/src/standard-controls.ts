@@ -62,6 +62,7 @@ function deckControls(g: string): ControlDef[] {
     // position / state (published by the engine)
     { group: g, key: DeckKeys.playPosition, default: 0, description: 'Play position 0..1' },
     { group: g, key: DeckKeys.trackLoaded, default: 0 },
+    { group: g, key: DeckKeys.loading, default: 0, description: '1 while a track is loading' },
     { group: g, key: DeckKeys.trackSamples, default: 0 },
     { group: g, key: DeckKeys.trackSampleRate, default: 0 },
     { group: g, key: DeckKeys.duration, default: 0, description: 'Duration (s)' },

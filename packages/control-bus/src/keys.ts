@@ -160,6 +160,7 @@ export const DeckKeys = {
   // position / state (read-mostly, published from the engine)
   playPosition: 'playposition', // 0..1 fraction of track
   trackLoaded: 'track_loaded',
+  loading: 'loading', // 1 while a track is decoding/loading into this deck (UI spinner)
   trackSamples: 'track_samples',
   trackSampleRate: 'track_samplerate',
   duration: 'duration', // seconds
