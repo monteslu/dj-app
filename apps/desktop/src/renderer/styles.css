@@ -676,6 +676,9 @@ body,
   display: flex;
   gap: 8px;
   align-items: center;
+  /* wrap to a second line instead of letting the last button (PFL/headphones) overflow
+     the deck when the window is too narrow to fit the whole row. */
+  flex-wrap: wrap;
 }
 /* EVERY button in the row is a tight fixed height with the extra space as vertical
    MARGIN (not internal padding) — cue/play and sync/qnt/keylock/bend/pfl all match. */
