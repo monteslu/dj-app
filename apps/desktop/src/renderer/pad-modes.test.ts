@@ -53,7 +53,8 @@ describe('pad modes', () => {
 
   it('stems combo pad: acapella = vocals only', () => {
     s.bus.set(s.g, DeckKeys.hasStems, 1);
-    const acapella = s.mode('stems').pads(0)[4]!; // first combo pad
+    // combo row order: drums-only, drumless, instrumental, acapella → acapella is last (idx 7)
+    const acapella = s.mode('stems').pads(0)[7]!;
     acapella.press(s.bus);
     expect(s.bus.get(s.g, DeckKeys.stemGain3)).toBe(1); // vocals on
     expect(s.bus.get(s.g, DeckKeys.stemGain0)).toBe(0); // drums off

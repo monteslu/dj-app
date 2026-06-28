@@ -93,11 +93,12 @@ const stemsMode: PadMode = {
     }));
 
     // combo pads (one-press stem mixes). 4x2 pads have room for full words.
+    // Row order: drums only → drumless → instrumental → acapella (least → most vocal).
     const combos: Array<{ label: string; title: string; on: boolean[] }> = [
-      { label: '🎤 ACAPELLA', title: 'Acapella — vocals only (mutes drums, bass, other)', on: [false, false, false, true] },
-      { label: '🎹 INSTRUMENTAL', title: 'Instrumental — everything but vocals', on: [true, true, true, false] },
       { label: '🥁 DRUMS ONLY', title: 'Drums only (mutes bass, other, vocals)', on: [true, false, false, false] },
       { label: '🚫🥁 DRUMLESS', title: 'Drumless — everything but drums', on: [false, true, true, true] },
+      { label: '🎹 INSTRUMENTAL', title: 'Instrumental — everything but vocals', on: [true, true, true, false] },
+      { label: '🎤 ACAPELLA', title: 'Acapella — vocals only (mutes drums, bass, other)', on: [false, false, false, true] },
     ];
     const comboPads: PadSpec[] = combos.map((c) => ({
       label: c.label,

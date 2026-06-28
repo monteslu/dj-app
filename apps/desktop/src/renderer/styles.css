@@ -237,6 +237,8 @@ body,
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 .brand {
+  /* MochaMix alone on the left; auto right-margin shoves everything else to the right edge */
+  margin-right: auto;
   font-weight: 800;
   font-size: 17px;
   letter-spacing: 0.3px;
@@ -245,11 +247,6 @@ body,
   background-clip: text;
   color: transparent;
 }
-.tagline {
-  color: var(--text-faint);
-  font-size: 12px;
-  font-style: italic;
-}
 .start-audio {
   margin-left: 8px;
   background: linear-gradient(180deg, var(--accent), var(--accent-2));
@@ -257,9 +254,6 @@ body,
   font-weight: 700;
   border: none;
   box-shadow: 0 0 18px var(--accent-glow);
-}
-.record-btn {
-  margin-left: auto;
 }
 .record-btn.recording {
   background: linear-gradient(180deg, color-mix(in srgb, var(--danger), #fff 15%), var(--danger));

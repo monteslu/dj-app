@@ -102,15 +102,14 @@ function Stage(): React.JSX.Element {
     <div className="app" data-theme={themeId}>
       <div className="titlebar">
         <span className="brand">MochaMix</span>
-        <span className="tagline">built for the love of it</span>
         <span className="build-stamp" title="renderer build time">
           {typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : 'dev'}
         </span>
-        <MainControls />
         <RecordButton />
         <button className="tiny" onClick={() => setShowPrefs(true)} title="Preferences">
           ⚙ preferences
         </button>
+        <MainControls />
       </div>
       {showPrefs && <Preferences onClose={() => setShowPrefs(false)} />}
       <WaveformBand />
