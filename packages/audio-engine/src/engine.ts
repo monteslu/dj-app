@@ -239,17 +239,22 @@ export class Engine {
       this.bus.connect(grp, DeckKeys.volume, (v) => setParam(g.volume.gain, v)),
     );
 
-    // EQ bands (knob 0..1..4 → dB)
-    const eqBands: Array<[string, BiquadFilterNode]> = [
-      [DeckKeys.eqLow, g.eqLow],
-      [DeckKeys.eqMid, g.eqMid],
-      [DeckKeys.eqHigh, g.eqHigh],
+    // EQ bands (knob 0..1..4 → dB) + per-band KILL (momentary full-cut while held). The
+    // effective gain is -inf (full kill) when the kill is engaged, else the knob's dB.
+    const EQ_KILL_DB = -150; // effectively silent for a shelf/peak band
+    const eqBands: Array<[string, string, BiquadFilterNode]> = [
+      [DeckKeys.eqLow, DeckKeys.eqLowKill, g.eqLow],
+      [DeckKeys.eqMid, DeckKeys.eqMidKill, g.eqMid],
+      [DeckKeys.eqHigh, DeckKeys.eqHighKill, g.eqHigh],
     ];
-    for (const [key, filter] of eqBands) {
-      filter.gain.value = eqKnobToDb(this.bus.get(grp, key));
-      this.disconnects.push(
-        this.bus.connect(grp, key, (v) => setParam(filter.gain, eqKnobToDb(v))),
-      );
+    for (const [knobKey, killKey, filter] of eqBands) {
+      const applyEq = () => {
+        const killed = this.bus.get(grp, killKey) > 0.5;
+        setParam(filter.gain, killed ? EQ_KILL_DB : eqKnobToDb(this.bus.get(grp, knobKey)));
+      };
+      applyEq();
+      this.disconnects.push(this.bus.connect(grp, knobKey, applyEq));
+      this.disconnects.push(this.bus.connect(grp, killKey, applyEq));
     }
 
     // crossfader: recompute this deck's contribution gain whenever crossfader,
