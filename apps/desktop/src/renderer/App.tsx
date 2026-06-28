@@ -14,6 +14,7 @@ import { Preferences } from './components/Preferences.js';
 import { MainControls } from './components/MainControls.js';
 import { TempoFader } from './components/Faders.js';
 import { WaveformBand } from './components/WaveformBand.js';
+import { Tooltip } from './components/Tooltip.js';
 import { startConsoleResize, clearConsoleHeight, applyConsoleHeight } from './panel-sizes.js';
 import { isDemo, seedDemo } from './demo.js';
 import { useTheme } from './theme.js';
@@ -128,6 +129,7 @@ function Stage(): React.JSX.Element {
           {started ? '● audio running' : 'audio idle, load a track to start'}
         </span>
       </footer>
+      <Tooltip />
     </div>
   );
 }

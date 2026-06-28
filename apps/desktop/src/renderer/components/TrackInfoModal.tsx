@@ -41,7 +41,9 @@ export function TrackInfoModal({
     ['Format', track.filetype ? track.filetype.toUpperCase() : '-'],
     ['Stems', track.stemPath ? 'Generated ✓' : 'Not generated'],
     ['Plays', String(track.timesPlayed ?? 0)],
-    ['Path', track.location],
+    // Once a track is converted to stems, the .stem.mp4 is the file we play + reference;
+    // show that. The original audio still exists on disk but isn't the active file.
+    ['Path', track.stemPath || track.location],
   ];
 
   return (

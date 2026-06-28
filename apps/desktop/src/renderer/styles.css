@@ -1669,6 +1669,33 @@ input[type='range'].xfader-slider::-webkit-slider-thumb {
   font-size: 11px;
 }
 
+/* ── app-wide custom tooltip (native title is unreliable under the rAF loop) ── */
+.app-tooltip {
+  position: fixed;
+  transform: translateX(-50%);
+  z-index: 3000;
+  max-width: 320px;
+  padding: 6px 10px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--edge-bright);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+  pointer-events: none;
+  white-space: normal;
+  animation: tip-fade 0.1s ease-out;
+}
+@keyframes tip-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 .library-table-wrap {
   flex: 1;
   overflow: auto;
