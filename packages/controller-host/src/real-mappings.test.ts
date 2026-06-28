@@ -4,7 +4,7 @@
  * JS (lodash → midi-components → device script) with the `script` global and confirm
  * the mapping's functions resolve and init() runs without throwing.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -96,6 +96,36 @@ describe.runIf(haveResources)('real Mixxx mappings', () => {
     expect(Object.keys(functions).length).toBeGreaterThan(0);
     // The device script's prefix object must exist and have run init() without throwing.
     expect(prefixObjects['DJ2GO2Touch']).toBeTruthy();
+  });
+
+  // Regression for the field bug: turning the browse knob threw "this.onKnobEvent is not
+  // a function" because the resolved handler was called with the wrong `this`. The
+  // handler is a method on `DJ2GO2Touch.browseEncoder` and calls `this.onKnobEvent(...)`,
+  // so the runtime must bind it to its parent component. Drive a real rotate message
+  // through it and assert it runs (drives [Playlist] SelectTrackKnob) without throwing.
+  it('DJ2GO2 browse-knob handler is bound to its component (this.onKnobEvent works)', () => {
+    const f = 'Numark_DJ2GO2_Touch.midi.xml';
+    if (!existsSync(join(DIR, f))) return;
+    const xml = read(f);
+    const mapping = parseMidiMapping(xml);
+    const js = mapping.scriptFiles
+      .map((sf) => sf.filename)
+      .filter(Boolean)
+      .map((fn) => `// ${fn}\n${read(fn)}`)
+      .join('\n;\n');
+    const bus = realBus();
+    bus.define({ group: '[Playlist]', key: 'SelectTrackKnob', default: 0 });
+    const engine = new EngineApi({ bus, log: () => {} });
+    const setValue = vi.spyOn(engine, 'setValue');
+    const midi = { sendShortMsg: () => {}, sendSysexMsg: () => {} };
+    const { functions } = runMappingScript(js, mapping, engine, midi, console, buildScriptGlobal(engine));
+    engine.stopAllTimers();
+
+    const browse = functions['DJ2GO2Touch.browseEncoder.input'];
+    expect(typeof browse).toBe('function');
+    // status 0xBF, value 0x01 → rotateValue +1 → onKnobEvent → [Playlist] SelectTrackKnob
+    expect(() => browse!(0x0f, 0x00, 0x01, 0xbf, '[Playlist]')).not.toThrow();
+    expect(setValue).toHaveBeenCalledWith('[Playlist]', 'SelectTrackKnob', 1);
   });
 
   // Bulk smoke test: load EVERY bundled mapping and count how many run without throwing.

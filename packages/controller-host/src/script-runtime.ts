@@ -155,7 +155,7 @@ export function runMappingScript(
     },
   });
   const body = `with (this) {\n${js}\n;${exporter}\n} return this;`;
-  // eslint-disable-next-line @typescript-eslint/no-implied-eval
+   
   const factory = new Function('engine', 'midi', 'console', 'script', body);
   try {
     factory.call(proxy, engine, midi, logger, scriptGlobal ?? {});
@@ -167,14 +167,22 @@ export function runMappingScript(
   const resolveFn = (path: string): ((...a: Array<number | string>) => void) | undefined => {
     const parts = path.split('.');
     let obj: unknown = result;
+    let parent: unknown = undefined;
     for (const p of parts) {
       if (obj && typeof obj === 'object' && p in (obj as Record<string, unknown>)) {
+        parent = obj;
         obj = (obj as Record<string, unknown>)[p];
       } else {
         return undefined;
       }
     }
-    return typeof obj === 'function' ? (obj as (...a: Array<number | string>) => void) : undefined;
+    if (typeof obj !== 'function') return undefined;
+    const fn = obj as (...a: Array<number | string>) => void;
+    // Bind to the PARENT object so `this` inside the handler is the component that owns
+    // it — Mixxx invokes these as methods (e.g. `DJ2GO2Touch.browseEncoder.input(...)`),
+    // and the handlers call `this.onKnobEvent(...)` / `this.previewSeekEnabled` / etc.
+    // A bare call would leave `this` undefined → "this.onKnobEvent is not a function".
+    return parent && typeof parent === 'object' ? fn.bind(parent) : fn;
   };
 
   const functions: ScriptFunctions = {};
