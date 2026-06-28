@@ -106,6 +106,14 @@ export const APP: Group = '[App]';
 export const LIBRARY: Group = '[Library]';
 /** Mixxx playlist/sidebar group (older mappings use [Playlist].SelectTrackKnob etc). */
 export const PLAYLIST: Group = '[Playlist]';
+/** Mixxx recording group: [Recording] toggle_recording + status. */
+export const RECORDING: Group = '[Recording]';
+
+/** Controls on the [Recording] group. */
+export const RecordingKeys = {
+  toggleRecording: 'toggle_recording', // pulse: start if stopped, stop+save if recording
+  status: 'status', // 1 = recording, 0 = idle (published by RecordingControl)
+} as const;
 
 /**
  * Library/browse controls (Mixxx-compatible). The Select/Load/Move pulse controls are

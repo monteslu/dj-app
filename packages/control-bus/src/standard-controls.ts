@@ -10,6 +10,8 @@ import {
   APP,
   LIBRARY,
   PLAYLIST,
+  RECORDING,
+  RecordingKeys,
   LibraryKeys,
   effectUnit,
   effectSlot,
@@ -247,6 +249,14 @@ function masterControls(): ControlDef[] {
   ];
 }
 
+/** [Recording] controls: a toggle pulse + a status the UI + controller LEDs read. */
+function recordingControls(): ControlDef[] {
+  return [
+    { group: RECORDING, key: RecordingKeys.toggleRecording, default: 0 },
+    { group: RECORDING, key: RecordingKeys.status, default: 0, description: '1 = recording' },
+  ];
+}
+
 /** App-wide controls. */
 function appControls(numDecks: number): ControlDef[] {
   return [
@@ -326,6 +336,7 @@ export function standardControls(numDecks: number): ControlDef[] {
     ...appControls(numDecks),
     ...masterControls(),
     ...libraryControls(),
+    ...recordingControls(),
     ...effectRackControls(numDecks),
   ];
   for (let i = 1; i <= numDecks; i++) {

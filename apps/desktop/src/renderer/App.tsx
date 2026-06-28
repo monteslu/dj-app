@@ -5,7 +5,8 @@
  */
 
 import { useState, useEffect } from 'react';
-import { DjProvider, useDj, NUM_DECKS } from './dj-context.js';
+import { RECORDING, RecordingKeys } from '@dj/control-bus';
+import { DjProvider, useDj, useControlValue, NUM_DECKS } from './dj-context.js';
 import { Deck } from './components/Deck.js';
 import { Mixer } from './components/Mixer.js';
 import { Library } from './components/Library.js';
@@ -50,25 +51,18 @@ function Splitter(): React.JSX.Element {
 }
 
 function RecordButton(): React.JSX.Element {
-  const { recording, started, start } = useDj();
-  const [rec, setRec] = useState(false);
+  const { recordingControl } = useDj();
+  // Drive + reflect via the [Recording] bus control, so the on-screen button and a
+  // controller's REC button share one state (and LEDs follow).
+  const rec = useControlValue(RECORDING, RecordingKeys.status) > 0.5;
   const [saving, setSaving] = useState(false);
 
   const toggle = async () => {
-    if (!started) {
-      await start();
-    }
-    if (rec) {
-      setSaving(true);
-      try {
-        await recording.stopAndSave();
-      } finally {
-        setRec(false);
-        setSaving(false);
-      }
-    } else {
-      await recording.start();
-      setRec(true);
+    if (rec) setSaving(true);
+    try {
+      await recordingControl.toggle();
+    } finally {
+      setSaving(false);
     }
   };
 
