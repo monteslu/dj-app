@@ -103,6 +103,29 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 /** Map an app:// request to a file under the renderer dir and stream it back. */
+/** Minimal extension → MIME map for the renderer's own assets (served from disk). */
+function mimeForPath(p: string): string {
+  const ext = p.slice(p.lastIndexOf('.') + 1).toLowerCase();
+  const map: Record<string, string> = {
+    html: 'text/html; charset=utf-8',
+    js: 'text/javascript; charset=utf-8',
+    mjs: 'text/javascript; charset=utf-8',
+    css: 'text/css; charset=utf-8',
+    json: 'application/json; charset=utf-8',
+    wasm: 'application/wasm',
+    map: 'application/json; charset=utf-8',
+    svg: 'image/svg+xml',
+    png: 'image/png',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    webp: 'image/webp',
+    woff2: 'font/woff2',
+    woff: 'font/woff',
+    ttf: 'font/ttf',
+  };
+  return map[ext] ?? 'application/octet-stream';
+}
+
 function handleAppProtocol(request: Request): Promise<Response> {
   const url = new URL(request.url);
   // app://app/index.html → RENDERER_DIR/index.html
@@ -132,18 +155,22 @@ function handleAppProtocol(request: Request): Promise<Response> {
   if (!filePath.startsWith(normalize(RENDERER_DIR))) {
     return Promise.resolve(new Response('forbidden', { status: 403 }));
   }
-  return net
-    .fetch(pathToFileURL(filePath).toString())
-    .then((res) => {
-      const headers = new Headers(res.headers);
-      for (const [k, v] of Object.entries(ISOLATION_HEADERS)) {
-        headers.set(k, v);
-      }
-      // Never let Electron's HTTP cache serve a stale renderer after a rebuild —
-      // index.html keeps a constant name but points at freshly-hashed assets, so a
-      // cached index.html would load the OLD bundle (looks like "no changes").
-      headers.set('Cache-Control', 'no-store, must-revalidate');
-      return new Response(res.body, { status: res.status, headers });
+  // Read bytes directly off disk instead of net.fetch(file://). net.fetch routes through
+  // Electron's network stack, which added ~seconds of latency to loading the renderer
+  // bundle on startup; a direct readFile is far faster and we set the headers ourselves.
+  return readFile(filePath)
+    .then((buf) => {
+      const headers = new Headers(ISOLATION_HEADERS);
+      headers.set('Content-Type', mimeForPath(pathname));
+      // Vite emits content-hashed, immutable files under /assets/ (index-<hash>.js). Cache
+      // those hard so relaunch serves them from cache. The HTML entry keeps a constant
+      // name (points at fresh hashes), so it must NOT cache or a rebuild loads stale code.
+      const immutable = pathname.startsWith('/assets/') && /-[A-Za-z0-9_-]{8,}\.\w+$/.test(pathname);
+      headers.set(
+        'Cache-Control',
+        immutable ? 'public, max-age=31536000, immutable' : 'no-store, must-revalidate',
+      );
+      return new Response(new Uint8Array(buf), { status: 200, headers });
     })
     .catch(() => new Response('not found', { status: 404 }));
 }

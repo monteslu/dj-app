@@ -22,7 +22,9 @@ createRoot(root).render(
     <App />
   </StrictMode>,
 );
-// Startup timing: attribute a slow black-screen on launch (bundle eval vs paint).
+// Startup timing: most of the launch delay is the module bundle fetch+compile BEFORE this
+// file runs (the inline boot spinner in index.html covers that window). Log first frame so
+// regressions are visible.
 requestAnimationFrame(() => {
   const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
   const sinceNav = nav ? performance.now() - nav.startTime : performance.now();

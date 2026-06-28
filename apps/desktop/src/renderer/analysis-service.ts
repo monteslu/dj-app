@@ -92,8 +92,20 @@ export class AnalysisService {
   /** Jobs waiting for a free worker. */
   private readonly waiting: Job[] = [];
 
+  private readonly poolTarget: number;
+
   constructor(size = analysisPoolSize()) {
-    for (let i = 0; i < size; i++) {
+    // LAZY: do NOT spawn workers here. Spawning the pool (each worker loads the ~400KB
+    // analysis bundle + WASM) during the first React render blocked first paint for
+    // seconds. Workers are created on first analyze() instead — startup paints fast and
+    // the pool warms up only when analysis is actually requested.
+    this.poolTarget = size;
+  }
+
+  /** Spawn the worker pool on first use (idempotent). */
+  private ensurePool(): void {
+    if (this.pool.length >= this.poolTarget) return;
+    for (let i = this.pool.length; i < this.poolTarget; i++) {
       // Regular Web Workers DO bundle via this Vite pattern (unlike AudioWorklets).
       const worker = new Worker(new URL('./analysis-worker-entry.ts', import.meta.url), {
         type: 'module',
@@ -114,9 +126,10 @@ export class AnalysisService {
     }
   }
 
-  /** Number of workers in the pool. */
+  /** Target pool size (the queue uses this for concurrency). Returns the target even
+   * before the pool is lazily spawned, so concurrency math is correct from the start. */
   get poolSize(): number {
-    return this.pool.length;
+    return this.poolTarget;
   }
 
   private drain(): void {
@@ -148,6 +161,7 @@ export class AnalysisService {
       computePeaks,
     };
     return new Promise<BeatGridResult>((resolve) => {
+      this.ensurePool(); // spawn workers on first real use (not at startup)
       this.waiting.push({ req, resolve });
       this.drain();
     });
