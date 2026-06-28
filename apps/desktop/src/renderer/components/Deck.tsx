@@ -35,7 +35,6 @@ export function Deck({ deckIndex, side = 'left' }: Props): React.JSX.Element {
   const duration = useControlValue(grp, DeckKeys.duration);
   const rateRatio = useControlValue(grp, DeckKeys.rateRatio);
 
-  const [loading, setLoading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const deckTrack = useDeckTrack(deckIndex);
   const trackName = deckTrack.artist
@@ -43,28 +42,19 @@ export function Deck({ deckIndex, side = 'left' }: Props): React.JSX.Element {
     : (deckTrack.title ?? '');
 
   // Load a file's bytes into this deck via the shared pipeline (decode → peaks →
-  // engine → analysis → deck-state). All the heavy logic lives in track-loader.ts.
+  // engine → analysis → deck-state). Loading state shows on the platter (bus `loading`
+  // control, set by loadTrackToDeck), so no local flag needed here.
   const load = useCallback(
     async (file: { name: string; data: ArrayBuffer; path?: string }, libraryId?: number) => {
-      setLoading(true);
-      try {
-        if (!started) await start();
-        await loadTrackToDeck({ engine, bus, analysis }, deckIndex, {
-          file,
-          coverPath: file.path,
-          libraryId,
-        });
-      } finally {
-        setLoading(false);
-      }
+      if (!started) await start();
+      await loadTrackToDeck({ engine, bus, analysis }, deckIndex, {
+        file,
+        coverPath: file.path,
+        libraryId,
+      });
     },
     [engine, bus, analysis, deckIndex, started, start],
   );
-
-  const onLoadClick = useCallback(async () => {
-    const file = await window.dj.openTrack();
-    if (file) await load(file);
-  }, [load]);
 
   const onDrop = useCallback(
     async (e: React.DragEvent) => {
@@ -180,9 +170,6 @@ export function Deck({ deckIndex, side = 'left' }: Props): React.JSX.Element {
             <span className={`deck-title ${trackName ? '' : 'empty'}`} title={trackName}>
               {deckTrack.title ?? 'no track loaded'}
             </span>
-            <button className="tiny" onClick={onLoadClick} disabled={loading}>
-              {loading ? '…' : 'load'}
-            </button>
           </div>
           <div className="deck-artist">{deckTrack.artist ?? ' '}</div>
           <div className="deck-readout">

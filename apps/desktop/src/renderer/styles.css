@@ -35,8 +35,8 @@
   --density: 1;
 
   /* derived control dimensions (use these, not raw px) */
-  --knob-sm: calc(28px * var(--u) * var(--density));
-  --knob-lg: calc(46px * var(--u) * var(--density));
+  --knob-sm: calc(22px * var(--u) * var(--density));
+  --knob-lg: calc(38px * var(--u) * var(--density));
   --fader-h: clamp(96px, 18vh, 210px);
   --fader-w: calc(22px * var(--u));
   --pad: calc(9px * var(--u) * var(--density));
