@@ -68,6 +68,7 @@ function deckControls(g: string): ControlDef[] {
     { group: g, key: DeckKeys.scratching, default: 0, description: 'Scratch active' },
     { group: g, key: DeckKeys.scratchRate, default: 0, min: -20, max: 20, description: 'Scratch rate (neg=reverse)' },
     { group: g, key: DeckKeys.keylock, default: 0, persist: true, description: 'Keylock on/off' },
+    { group: g, key: DeckKeys.slipEnabled, default: 0, description: 'Slip mode on/off' },
     { group: g, key: DeckKeys.beatsync, default: 0, description: 'Pulse: one-shot match tempo + phase' },
     { group: g, key: DeckKeys.syncEnabled, default: 0, description: 'Beat sync follower on/off' },
     { group: g, key: DeckKeys.syncLeader, default: 0, description: 'Explicit sync leader' },

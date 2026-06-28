@@ -297,6 +297,11 @@ class EngineProcessor extends AudioWorkletProcessor {
       const ratioOverride = sabRead(control, idx.rateRatioOverride);
       const scratching = idx.scratching !== undefined && sabRead(control, idx.scratching) > 0.5;
       const scratchRate = idx.scratchRate !== undefined ? sabRead(control, idx.scratchRate) : 0;
+      // Slip mode: setSlip is edge-idempotent (acts only on on/off transitions), so
+      // pushing the current value every block is safe and keeps the ghost in sync.
+      if (idx.slipEnabled !== undefined) {
+        slot.playback.setSlip(sabRead(control, idx.slipEnabled) > 0.5);
+      }
 
       // Scratch OVERRIDES everything: signed speed (negative = reverse), and it
       // sounds even when the deck is "stopped" (vinyl moves under the hand).

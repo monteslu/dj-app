@@ -61,6 +61,31 @@ describe('DeckPlayback loop wrap', () => {
     d.setLoop(200, 200, true);
     expect(d.isLoopEnabled()).toBe(false);
   });
+
+  it('slip mode: loop holds the audible position, but disabling slip snaps to the ghost', () => {
+    const d = new DeckPlayback(48000);
+    d.loadTrack(ramp(100000));
+    d.seekFrames(1000);
+    d.setSlip(true); // ghost starts at 1000
+    d.setLoop(1000, 1500, true); // a 500-frame loop
+    const out = [new Float32Array(256), new Float32Array(256)];
+    // Play through several blocks: audible position wraps inside the loop, ghost runs on.
+    for (let i = 0; i < 8; i++) d.process(out, 256, 1, true);
+    expect(d.getPositionFrames()).toBeLessThan(1500); // audible stayed in the loop
+    d.setSlip(false); // snap to where the song WOULD be
+    expect(d.getPositionFrames()).toBeGreaterThanOrEqual(1000 + 8 * 256 - 2);
+  });
+
+  it('slip ghost does not advance while stopped', () => {
+    const d = new DeckPlayback(48000);
+    d.loadTrack(ramp(100000));
+    d.seekFrames(2000);
+    d.setSlip(true);
+    const out = [new Float32Array(256), new Float32Array(256)];
+    d.process(out, 256, 1, false); // not playing
+    d.setSlip(false);
+    expect(d.getPositionFrames()).toBe(2000); // unchanged
+  });
 });
 
 describe('CueControl', () => {

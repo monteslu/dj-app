@@ -200,6 +200,7 @@ export class Engine {
       rateRatio: r(DeckKeys.rateRatio),
       rateRatioOverride: r(DeckKeys.rateRatioOverride),
       scratching: r(DeckKeys.scratching),
+      slipEnabled: r(DeckKeys.slipEnabled),
       scratchRate: r(DeckKeys.scratchRate),
       quantize: r(DeckKeys.quantize),
       platterReleaseMode: r(DeckKeys.platterReleaseMode),

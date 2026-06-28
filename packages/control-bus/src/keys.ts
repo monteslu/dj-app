@@ -141,6 +141,10 @@ export const DeckKeys = {
   firstBeatFrame: 'beat_first_frame', // grid phase: frame of the first beat (-1 = unknown)
   keylock: 'keylock',
 
+  // slip mode (Mixxx slip_enabled): playback continues underneath loops/scratch; on
+  // disable, snap to where the song would be.
+  slipEnabled: 'slip_enabled',
+
   // beat sync (Mixxx-compatible names)
   beatsync: 'beatsync', // pulse: one-shot match tempo + phase to the other deck (no latch)
   syncEnabled: 'sync_enabled', // 1 = this deck follows the sync leader

@@ -25,6 +25,7 @@ export interface DeckControlIndices {
   rateRatio: number;
   rateRatioOverride: number;
   scratching: number;
+  slipEnabled: number;
   scratchRate: number;
   quantize: number;
   platterReleaseMode: number;

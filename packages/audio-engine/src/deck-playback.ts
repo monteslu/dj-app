@@ -72,6 +72,12 @@ export class DeckPlayback {
   /** Crossfade length (source frames) applied across a loop seam to avoid clicks. */
   private static readonly SEAM_FADE = 64;
 
+  // Slip mode (Mixxx slip_enabled): while on, a GHOST position keeps advancing linearly
+  // underneath loops/scratches/hotcue holds; turning slip off snaps playback to where it
+  // WOULD be — so loops/scratches don't lose your place in the mix.
+  private slipEnabled = false;
+  private slipPosition = 0;
+
   constructor(private engineSampleRate: number) {}
 
   loadTrack(track: DeckTrack): void {
@@ -267,6 +273,22 @@ export class DeckPlayback {
     return { start: this.loopStart, end: this.loopEnd, enabled: this.loopEnabled };
   }
 
+  /** Enable/disable slip mode. On enable, the ghost starts at the current position; on
+   * disable, playback SNAPS to the ghost (where it would be without the loop/scratch). */
+  setSlip(enabled: boolean): void {
+    if (enabled && !this.slipEnabled) {
+      this.slipPosition = this.position;
+    } else if (!enabled && this.slipEnabled) {
+      this.position = Math.min(this.slipPosition, this.frames);
+      this.scalerCursor = this.position;
+    }
+    this.slipEnabled = enabled;
+  }
+
+  isSlipEnabled(): boolean {
+    return this.slipEnabled;
+  }
+
   /**
    * Linear-interpolation read of `numFrames` from the source into planar
    * `outputs`, advancing the play position by `resampleRatio` source frames per
@@ -314,6 +336,13 @@ export class DeckPlayback {
   ): boolean {
     const track = this.track;
     const outChannels = outputs.length;
+
+    // Slip ghost: advance the linear (no-wrap) shadow position while playing, so when
+    // slip turns off we snap to where the song WOULD be. Tracks the musical speed; the
+    // audible output (loop/scratch) is unaffected.
+    if (this.slipEnabled && playing && speed !== 0) {
+      this.slipPosition = Math.min(track ? track.frames : 0, this.slipPosition + speed * numFrames);
+    }
 
     if (!track || !playing || speed === 0) {
       for (let c = 0; c < outChannels; c++) {
