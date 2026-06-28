@@ -232,10 +232,14 @@ async function loadStemFile(
   const { engine, bus, analysis } = deps;
   const ctx = engine.audioContext;
   if (!ctx) return false;
+  // The deck was already marked loading by loadTrackToDeck; we time the stem phases here.
+  const t0 = performance.now();
+  const sizeMB = src.file.data.byteLength / 1048576;
   try {
     const tracks = extractAllTracks(new Uint8Array(src.file.data));
     // STEMS-4 layout: [mixdown, drums, bass, other, vocals]. Need all 5.
     if (tracks.length < 5) return false;
+    const tDemux = performance.now();
     const mixdown = tracks[0]!;
     const stemBytes = tracks.slice(1, 5);
 
@@ -253,6 +257,7 @@ async function loadStemFile(
       mixdown.byteOffset + mixdown.byteLength,
     ) as ArrayBuffer;
     const mixDecoded = await decodeArrayBuffer(ctx, mixAb, 'mixdown.m4a');
+    const tDecode = performance.now();
     const all = new Float32Array(mixDecoded.sampleBuffer);
     const ch: Float32Array[] = [];
     for (let c = 0; c < mixDecoded.channels; c++) {
@@ -280,6 +285,7 @@ async function loadStemFile(
     }
     const sharedScale = 255 / sharedMax;
     const stemScales = stemPeaks.map(() => sharedScale);
+    const tPeaks = performance.now();
 
     const m = { ...(src.file.meta ?? {}), ...(src.meta ?? {}) };
     setDeckTrack(deckIndex, {
@@ -296,6 +302,15 @@ async function loadStemFile(
 
     engine.loadStems(deckIndex, stems, { bpm: m.bpm });
     const g = deckGroup(deckIndex + 1);
+    // Stem track is ready — clear the spinner + log where the (heavier) stem load went:
+    // demux the 5 streams, decode 5 (4 stems + mixdown), 5 peak passes, engine upload.
+    bus.set(g, DeckKeys.loading, 0);
+    console.log(
+      `[load] deck ${deckIndex + 1} STEMS "${src.file.name}" ${sizeMB.toFixed(1)}MB ${dur.toFixed(0)}s ` +
+        `in ${(performance.now() - t0).toFixed(0)}ms — demux ${(tDemux - t0).toFixed(0)}ms, ` +
+        `decode(5) ${(tDecode - tDemux).toFixed(0)}ms, peaks(5) ${(tPeaks - tDecode).toFixed(0)}ms, ` +
+        `engine ${(performance.now() - tPeaks).toFixed(0)}ms`,
+    );
     if (m.bpm && m.bpm > 0) bus.set(g, DeckKeys.fileBpm, m.bpm);
     // Restore the stored grid phase (same fix as the normal path) so a stems deck snaps
     // to the REAL beat-one — without this, a stem deck used a frame-0 grid and never
