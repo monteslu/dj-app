@@ -161,9 +161,11 @@ export function Deck({ deckIndex, side = 'left' }: Props): React.JSX.Element {
       onDrop={onDrop}
       aria-label={`Deck ${deckIndex + 1}`}
     >
-      {/* top: spinning platter + track info */}
+      {/* top: spinning platter on the left; a column of info + transport on the right,
+          filling the record's height so there's no dead space beside it */}
       <div className="deck-top">
         <Platter deckIndex={deckIndex} coverUrl={deckTrack.coverUrl} />
+        <div className="deck-top-col">
         <div className="deck-info">
           <div className="deck-info-head">
             <span className="deck-label">{deckIndex + 1}</span>
@@ -203,11 +205,8 @@ export function Deck({ deckIndex, side = 'left' }: Props): React.JSX.Element {
             </span>
           </div>
         </div>
-      </div>
 
-      <OverviewStrip deckIndex={deckIndex} />
-
-      <div className="deck-transport">
+        <div className="deck-transport">
         <button
           className="cue-btn"
           onPointerDown={cueDown}
@@ -259,7 +258,11 @@ export function Deck({ deckIndex, side = 'left' }: Props): React.JSX.Element {
         >
           🎧
         </button>
+        </div>
+        </div>
       </div>
+
+      <OverviewStrip deckIndex={deckIndex} />
 
       <HotcueRow deckIndex={deckIndex} />
       <LoopRow deckIndex={deckIndex} />
