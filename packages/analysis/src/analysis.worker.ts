@@ -20,7 +20,7 @@
 
 import { WasmQmAnalysis, WasmPeaks } from '@dj/dsp-wasm';
 import { detailBucketsForDuration, OVERVIEW_BUCKETS } from '@dj/waveform';
-import type { AnalyzeRequest, AnalyzeResponse } from './worker-protocol.js';
+import type { AnalyzeRequest, AnalyzeResponse, PeaksRequest, PeaksResponse } from './worker-protocol.js';
 
 declare const self: DedicatedWorkerGlobalScope;
 
@@ -30,8 +30,45 @@ declare const self: DedicatedWorkerGlobalScope;
 const qm = new WasmQmAnalysis();
 const peaksWasm = new WasmPeaks();
 
-self.onmessage = (e: MessageEvent<AnalyzeRequest>) => {
+self.onmessage = (e: MessageEvent<AnalyzeRequest | PeaksRequest>) => {
   const msg = e.data;
+
+  // Peaks-only: compute the full band PeakSet for one track + return it (no QM analysis).
+  // This is the load path's heavy band-split work, moved OFF the main thread so loading a
+  // track (esp. a stem song = 5 of these) never freezes the UI.
+  if (msg.type === 'peaks') {
+    const mono = new Float32Array(msg.mono, 0, msg.frames);
+    const p = peaksWasm.compute([mono], msg.frames, msg.detailBuckets, OVERVIEW_BUCKETS, msg.sampleRate);
+    const res: PeaksResponse = {
+      type: 'peaks',
+      id: msg.id,
+      detailLength: p.detail.length,
+      detailPeaks: p.detail.peaks,
+      detailLow: p.detail.low,
+      detailMid: p.detail.mid,
+      detailHigh: p.detail.high,
+      detailFramesPerBucket: p.detail.framesPerBucket,
+      overviewLength: p.overview.length,
+      overviewPeaks: p.overview.peaks,
+      overviewLow: p.overview.low,
+      overviewMid: p.overview.mid,
+      overviewHigh: p.overview.high,
+      overviewFramesPerBucket: p.overview.framesPerBucket,
+    };
+    // Transfer all 8 band buffers back (zero-copy).
+    self.postMessage(res, [
+      res.detailPeaks.buffer,
+      res.detailLow.buffer,
+      res.detailMid.buffer,
+      res.detailHigh.buffer,
+      res.overviewPeaks.buffer,
+      res.overviewLow.buffer,
+      res.overviewMid.buffer,
+      res.overviewHigh.buffer,
+    ]);
+    return;
+  }
+
   if (msg.type !== 'analyze') {
     return;
   }

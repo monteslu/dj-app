@@ -5,7 +5,7 @@
  */
 
 export { Beats } from './beats.js';
-export type { AnalyzeRequest, AnalyzeResponse } from './worker-protocol.js';
+export type { AnalyzeRequest, AnalyzeResponse, PeaksRequest, PeaksResponse } from './worker-protocol.js';
 export {
   type KeyNum,
   isValidKey,

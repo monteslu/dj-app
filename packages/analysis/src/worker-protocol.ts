@@ -19,6 +19,36 @@ export interface AnalyzeRequest {
   detailBuckets?: number;
 }
 
+/** Peaks-only request: compute the full band PeakSet for ONE track off the main thread
+ *  (no beat/key analysis). Used by the load path so the heavy band-split filtering never
+ *  blocks the UI. mono samples are TRANSFERRED in. */
+export interface PeaksRequest {
+  type: 'peaks';
+  id: number;
+  mono: ArrayBuffer;
+  frames: number;
+  sampleRate: number;
+  detailBuckets: number;
+}
+
+/** Full band peaks for one track (detail + overview), returned as transferables. */
+export interface PeaksResponse {
+  type: 'peaks';
+  id: number;
+  detailLength: number;
+  detailPeaks: Uint8Array;
+  detailLow: Uint8Array;
+  detailMid: Uint8Array;
+  detailHigh: Uint8Array;
+  detailFramesPerBucket: number;
+  overviewLength: number;
+  overviewPeaks: Uint8Array;
+  overviewLow: Uint8Array;
+  overviewMid: Uint8Array;
+  overviewHigh: Uint8Array;
+  overviewFramesPerBucket: number;
+}
+
 export interface AnalyzeResponse {
   type: 'analyzed';
   id: number;

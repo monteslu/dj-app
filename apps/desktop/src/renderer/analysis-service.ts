@@ -11,8 +11,15 @@
  * routes each request to an idle worker and queues overflow internally.
  */
 
-import type { AnalyzeRequest, AnalyzeResponse } from '@dj/analysis';
+import type { AnalyzeRequest, AnalyzeResponse, PeaksRequest, PeaksResponse } from '@dj/analysis';
 import type { AnalysisAudio } from '@dj/codec';
+import type { PeakData } from '@dj/waveform';
+
+/** Full band peak set (detail + overview), the shape the waveform render consumes. */
+export interface PeakSetResult {
+  detail: PeakData;
+  overview: PeakData;
+}
 
 export interface BeatGridResult {
   bpm: number;
@@ -62,9 +69,14 @@ interface PoolWorker {
   busy: boolean;
 }
 
+/** A queued worker job: the request, its transferable, and a typed response handler.
+ * Generalized so the pool serves both `analyze` and `peaks` requests. */
 interface Job {
-  req: AnalyzeRequest;
-  resolve: (r: BeatGridResult) => void;
+  req: AnalyzeRequest | PeaksRequest;
+  /** The ArrayBuffer to transfer with the message (the mono samples). */
+  transfer: ArrayBuffer;
+  /** Called with the matching response for this job's id. */
+  onResponse: (msg: AnalyzeResponse | PeaksResponse) => void;
 }
 
 function toResult(msg: Extract<AnalyzeResponse, { type: 'analyzed' }>): BeatGridResult {
@@ -87,8 +99,11 @@ function toResult(msg: Extract<AnalyzeResponse, { type: 'analyzed' }>): BeatGrid
 export class AnalysisService {
   private readonly pool: PoolWorker[] = [];
   private nextId = 1;
-  /** id → { resolver, the worker running it } so we route the reply correctly. */
-  private readonly pending = new Map<number, { resolve: (r: BeatGridResult) => void; w: PoolWorker }>();
+  /** id → { response handler, the worker running it } so we route the reply correctly. */
+  private readonly pending = new Map<
+    number,
+    { onResponse: (msg: AnalyzeResponse | PeaksResponse) => void; w: PoolWorker }
+  >();
   /** Jobs waiting for a free worker. */
   private readonly waiting: Job[] = [];
 
@@ -111,13 +126,13 @@ export class AnalysisService {
         type: 'module',
       });
       const pw: PoolWorker = { worker, busy: false };
-      worker.onmessage = (e: MessageEvent<AnalyzeResponse>) => {
+      worker.onmessage = (e: MessageEvent<AnalyzeResponse | PeaksResponse>) => {
         const msg = e.data;
-        if (msg.type !== 'analyzed') return;
+        if (msg.type !== 'analyzed' && msg.type !== 'peaks') return;
         const entry = this.pending.get(msg.id);
         if (entry) {
           this.pending.delete(msg.id);
-          entry.resolve(toResult(msg));
+          entry.onResponse(msg);
         }
         pw.busy = false;
         this.drain(); // a worker freed up — start the next queued job
@@ -138,9 +153,9 @@ export class AnalysisService {
       if (!free) return; // all busy; wait for an onmessage to free one
       const job = this.waiting.shift()!;
       free.busy = true;
-      this.pending.set(job.req.id, { resolve: job.resolve, w: free });
+      this.pending.set(job.req.id, { onResponse: job.onResponse, w: free });
       // Transfer the mono buffer so the main thread frees it (no copy, no lingering).
-      free.worker.postMessage(job.req, [job.req.mono]);
+      free.worker.postMessage(job.req, [job.transfer]);
     }
   }
 
@@ -162,7 +177,54 @@ export class AnalysisService {
     };
     return new Promise<BeatGridResult>((resolve) => {
       this.ensurePool(); // spawn workers on first real use (not at startup)
-      this.waiting.push({ req, resolve });
+      this.waiting.push({
+        req,
+        transfer: audio.mono,
+        onResponse: (msg) => {
+          if (msg.type === 'analyzed') resolve(toResult(msg));
+        },
+      });
+      this.drain();
+    });
+  }
+
+  /**
+   * Compute the full band PeakSet for one track IN A WORKER (off the main thread). The
+   * load path uses this so the heavy Bessel-4 band-split filtering never freezes the UI —
+   * a stem song fans out 5 of these across the pool. `mono` is TRANSFERRED in.
+   */
+  computePeaks(mono: ArrayBuffer, frames: number, sampleRate: number, detailBuckets: number): Promise<PeakSetResult> {
+    const id = this.nextId++;
+    const req: PeaksRequest = { type: 'peaks', id, mono, frames, sampleRate, detailBuckets };
+    return new Promise<PeakSetResult>((resolve) => {
+      this.ensurePool();
+      this.waiting.push({
+        req,
+        transfer: mono,
+        onResponse: (msg) => {
+          if (msg.type !== 'peaks') return;
+          resolve({
+            detail: {
+              length: msg.detailLength,
+              peaks: msg.detailPeaks,
+              low: msg.detailLow,
+              mid: msg.detailMid,
+              high: msg.detailHigh,
+              framesPerBucket: msg.detailFramesPerBucket,
+              frames,
+            },
+            overview: {
+              length: msg.overviewLength,
+              peaks: msg.overviewPeaks,
+              low: msg.overviewLow,
+              mid: msg.overviewMid,
+              high: msg.overviewHigh,
+              framesPerBucket: msg.overviewFramesPerBucket,
+              frames,
+            },
+          });
+        },
+      });
       this.drain();
     });
   }

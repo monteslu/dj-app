@@ -10,8 +10,7 @@
  */
 
 import { decodeArrayBuffer, analysisFromDecoded } from '@dj/codec';
-import { detailBucketsForDuration, packPeaks, OVERVIEW_BUCKETS, type PeakData } from '@dj/waveform';
-import { WasmPeaks } from '@dj/dsp-wasm';
+import { detailBucketsForDuration, packPeaks, type PeakData } from '@dj/waveform';
 import { deck as deckGroup, DeckKeys, type ControlBus } from '@dj/control-bus';
 import { camelotToKey, shortestStepsToCompatibleKey } from '@dj/analysis';
 import type { Engine } from '@dj/audio-engine';
@@ -19,19 +18,26 @@ import { extractAllTracks } from '@dj/stem-mp4';
 import type { AnalysisService } from './analysis-service.js';
 import { setDeckTrack } from './deck-state.js';
 
-// Shared WASM+SIMD peak computer for load-time waveforms. The old pure-JS computePeakSet
-// walked every sample in a JS loop ON THE MAIN THREAD — ~844ms for a stem track's 5 peak
-// passes, a visible stall. The WASM path (same Mixxx Bessel-4 band peaks the analyzer
-// uses) does it in a fraction of that. Lazily built on first load.
-let peaksWasm: WasmPeaks | null = null;
-function computePeakSet(
-  channelData: Float32Array[],
+// Load-time waveform peaks run IN THE ANALYSIS WORKER (off the main thread). The band-
+// split filtering (Bessel-4 low/mid/high) is heavy — a stem song needs it 6× (mixdown +
+// 4 stems) and doing it synchronously froze the UI for ~600-850ms (a multi-frame jank).
+// We downmix each track to a fresh mono buffer and hand it to the pool; the 6 passes fan
+// out across workers and the main thread never blocks. Returns the full band PeakSet.
+function downmixMono(channels: Float32Array[], frames: number): ArrayBuffer {
+  const left = channels[0]!;
+  const right = channels.length > 1 ? channels[1]! : left;
+  const mono = new Float32Array(frames);
+  for (let i = 0; i < frames; i++) mono[i] = 0.5 * (left[i]! + right[i]!);
+  return mono.buffer;
+}
+function peaksInWorker(
+  analysis: AnalysisService,
+  channels: Float32Array[],
   frames: number,
   detailBuckets: number,
   sampleRate: number,
-): { detail: PeakData; overview: PeakData } {
-  peaksWasm ??= new WasmPeaks();
-  return peaksWasm.compute(channelData, frames, detailBuckets, OVERVIEW_BUCKETS, sampleRate);
+): Promise<{ detail: PeakData; overview: PeakData }> {
+  return analysis.computePeaks(downmixMono(channels, frames), frames, sampleRate, detailBuckets);
 }
 
 export interface TrackLoaderDeps {
@@ -134,7 +140,8 @@ export async function loadTrackToDeck(
     channels.push(all.subarray(c * decoded.frames, (c + 1) * decoded.frames));
   }
   const dur = decoded.frames / decoded.sampleRate;
-  const peaks = computePeakSet(
+  const peaks = await peaksInWorker(
+    analysis,
     channels,
     decoded.frames,
     detailBucketsForDuration(dur),
@@ -282,16 +289,18 @@ async function loadStemFile(
     }
     const dur = mixDecoded.frames / mixDecoded.sampleRate;
     const detailBuckets = detailBucketsForDuration(dur);
-    const peaks = computePeakSet(ch, mixDecoded.frames, detailBuckets, mixDecoded.sampleRate);
 
-    // Per-stem peaks (detail for the top scrolling lane, overview for the deck strip) so
-    // BOTH waveforms can color each stem (the mashup view).
-    const stemSets = stems.map((s) => {
-      const sAll = new Float32Array(s.sampleBuffer);
-      const sCh: Float32Array[] = [];
-      for (let c = 0; c < s.channels; c++) sCh.push(sAll.subarray(c * s.frames, (c + 1) * s.frames));
-      return computePeakSet(sCh, s.frames, detailBuckets, s.sampleRate);
-    });
+    // Mixdown + per-stem peaks, all computed IN THE WORKER POOL in parallel (6 passes fan
+    // out across workers instead of blocking the main thread one after another).
+    const [peaks, ...stemSets] = await Promise.all([
+      peaksInWorker(analysis, ch, mixDecoded.frames, detailBuckets, mixDecoded.sampleRate),
+      ...stems.map((s) => {
+        const sAll = new Float32Array(s.sampleBuffer);
+        const sCh: Float32Array[] = [];
+        for (let c = 0; c < s.channels; c++) sCh.push(sAll.subarray(c * s.frames, (c + 1) * s.frames));
+        return peaksInWorker(analysis, sCh, s.frames, detailBuckets, s.sampleRate);
+      }),
+    ]);
     const stemPeaks = stemSets.map((p) => p.detail);
     const stemOverviewPeaks = stemSets.map((p) => p.overview);
     // Normalize all stems by ONE shared max (the loudest stem), like Mixxx
