@@ -430,6 +430,86 @@ export class LibraryDb {
       .run(playlistId, trackId, pos.p);
   }
 
+  /** Tracks in a playlist, IN PLAYLIST ORDER (by position). Joins the full track row so the
+   *  library table can render them like any other listing. Unlike crates, playlists are
+   *  ordered and may contain the same track more than once. */
+  playlistTracks(playlistId: number): TrackRow[] {
+    const sql = `
+      SELECT l.id, t.location, t.filename,
+             l.artist, l.title, l.album, l.genre, l.year,
+             l.duration, l.bitrate, l.samplerate,
+             l.bpm, l.first_beat_frame AS firstBeatFrame,
+             l.key, l.rating, l.color, l.datetime_added AS dateAdded,
+             l.timesplayed AS timesPlayed, l.filetype,
+             l.stem_path AS stemPath, l.stems_generated_at AS stemsGeneratedAt
+      FROM playlist_tracks pt
+      JOIN library l ON pt.track_id = l.id
+      JOIN track_locations t ON l.location = t.id
+      WHERE pt.playlist_id = ? AND l.mixxx_deleted = 0 AND t.fs_deleted = 0
+      ORDER BY pt.position ASC`;
+    return this.db.prepare(sql).all(playlistId) as unknown as TrackRow[];
+  }
+
+  /** Remove the FIRST occurrence of a track from a playlist, then close the position gap so
+   *  positions stay contiguous (Mixxx PlaylistDAO behavior). */
+  removeFromPlaylist(playlistId: number, trackId: number): void {
+    const tx = this.db.transaction(() => {
+      const row = this.db
+        .prepare(
+          'SELECT position FROM playlist_tracks WHERE playlist_id = ? AND track_id = ? ORDER BY position ASC LIMIT 1',
+        )
+        .get(playlistId, trackId) as { position: number } | undefined;
+      if (!row) return;
+      this.db
+        .prepare('DELETE FROM playlist_tracks WHERE playlist_id = ? AND track_id = ? AND position = ?')
+        .run(playlistId, trackId, row.position);
+      this.db
+        .prepare('UPDATE playlist_tracks SET position = position - 1 WHERE playlist_id = ? AND position > ?')
+        .run(playlistId, row.position);
+    });
+    tx();
+  }
+
+  renamePlaylist(playlistId: number, name: string): void {
+    this.db
+      .prepare('UPDATE playlists SET name = ?, date_modified = CURRENT_TIMESTAMP WHERE id = ?')
+      .run(name, playlistId);
+  }
+
+  deletePlaylist(playlistId: number): void {
+    // playlist_tracks FK is ON DELETE CASCADE, so deleting the playlist clears its rows.
+    this.db.prepare('DELETE FROM playlists WHERE id = ?').run(playlistId);
+  }
+
+  /** Move a track from one position to another within a playlist (1-based positions),
+   *  shifting the rows in between (Mixxx moveTrack semantics). */
+  reorderPlaylistTrack(playlistId: number, fromPos: number, toPos: number): void {
+    if (fromPos === toPos) return;
+    const tx = this.db.transaction(() => {
+      // park the moved row at a sentinel position
+      this.db
+        .prepare('UPDATE playlist_tracks SET position = -1 WHERE playlist_id = ? AND position = ?')
+        .run(playlistId, fromPos);
+      if (toPos < fromPos) {
+        this.db
+          .prepare(
+            'UPDATE playlist_tracks SET position = position + 1 WHERE playlist_id = ? AND position >= ? AND position < ?',
+          )
+          .run(playlistId, toPos, fromPos);
+      } else {
+        this.db
+          .prepare(
+            'UPDATE playlist_tracks SET position = position - 1 WHERE playlist_id = ? AND position > ? AND position <= ?',
+          )
+          .run(playlistId, fromPos, toPos);
+      }
+      this.db
+        .prepare('UPDATE playlist_tracks SET position = ? WHERE playlist_id = ? AND position = -1')
+        .run(toPos, playlistId);
+    });
+    tx();
+  }
+
   // --- Directories ----------------------------------------------------------
 
   addDirectory(dir: string): void {

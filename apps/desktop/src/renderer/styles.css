@@ -1398,13 +1398,15 @@ input[type='range'].xfader-slider::-webkit-slider-thumb {
   width: 124px;
 }
 .td-wave {
-  /* hug the 120px thumbnail: 2px L/R padding → 124px total, no dead space before ARTIST */
+  /* hug the thumbnail: 2px L/R padding, no dead space before ARTIST */
   padding: 2px 2px !important;
-  width: 124px;
+  width: 112px;
 }
 .rowwave {
-  display: inline-block;
-  width: 120px;
+  display: block;
+  /* fill the cell width so there's never empty space to the right of the waveform image
+     (the img's intrinsic 120px was wider than the cell, leaving a gap) */
+  width: 100%;
   height: 22px;
   border-radius: 3px;
   vertical-align: middle;
@@ -1419,6 +1421,200 @@ input[type='range'].xfader-slider::-webkit-slider-thumb {
   justify-content: center;
   background: var(--sunken);
 }
+/* library body = playlist sidebar + the scrollable table */
+.library-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ── playlist sidebar ─────────────────────────────────────── */
+.playlist-sidebar {
+  flex: 0 0 168px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 6px;
+  overflow-y: auto;
+  background: var(--sunken);
+  border-right: 1px solid var(--edge);
+}
+.pl-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  padding: 6px 8px;
+  font-size: 12px;
+  color: var(--text-dim);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pl-item:hover {
+  background: var(--panel-2);
+  color: var(--text);
+}
+.pl-item.active {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+}
+.pl-icon {
+  opacity: 0.7;
+  flex: 0 0 auto;
+}
+.pl-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 10px 4px 2px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+}
+.pl-add {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 4px;
+}
+.pl-add:hover {
+  color: var(--accent);
+}
+.pl-empty {
+  font-size: 11px;
+  color: var(--text-faint);
+  padding: 4px 8px;
+}
+.pl-actions {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--edge);
+}
+.pl-actions button {
+  font-size: 11px;
+  padding: 4px 8px;
+  background: var(--panel-2);
+  border: 1px solid var(--edge);
+  border-radius: 5px;
+  color: var(--text-dim);
+  cursor: pointer;
+  text-align: left;
+}
+.pl-actions button:hover {
+  color: var(--text);
+  border-color: var(--edge-bright);
+}
+
+/* ── right-click context menu ─────────────────────────────── */
+.ctx-root {
+  position: fixed;
+  z-index: 2000;
+}
+.ctx-menu {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  min-width: 200px;
+  background: var(--panel);
+  border: 1px solid var(--edge-bright);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+.ctx-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  font-size: 12px;
+  color: var(--text);
+  border-radius: 5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ctx-item:hover:not(.disabled) {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.ctx-item.disabled {
+  color: var(--text-faint);
+  cursor: default;
+}
+.ctx-icon {
+  width: 16px;
+  text-align: center;
+  opacity: 0.85;
+  flex: 0 0 auto;
+}
+.ctx-label {
+  flex: 1;
+}
+.ctx-arrow {
+  opacity: 0.6;
+  margin-left: 8px;
+}
+.ctx-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--edge);
+}
+.ctx-submenu {
+  position: absolute;
+  top: -5px;
+  left: 100%;
+  /* sub-list reuses .ctx-menu styling */
+}
+
+/* ── prompt / confirm modal (Electron has no window.prompt) ─── */
+.prompt-modal {
+  min-width: 320px;
+  max-width: 90vw;
+  padding: 20px;
+  background: var(--panel);
+  border: 1px solid var(--edge-bright);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.prompt-modal h3 {
+  margin: 0 0 14px;
+  font-size: 14px;
+  color: var(--text);
+}
+.prompt-modal input {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 13px;
+  background: var(--sunken);
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  color: var(--text);
+}
+.prompt-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+.prompt-ok {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent), #fff 15%), var(--accent));
+  color: var(--on-accent);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
 .library-table-wrap {
   flex: 1;
   overflow: auto;
@@ -1437,7 +1633,7 @@ input[type='range'].xfader-slider::-webkit-slider-thumb {
 }
 /* fixed utility columns (not user-resizable) */
 .library-table col.col-wave {
-  width: 124px;
+  width: 112px;
 }
 .library-table col.col-load {
   width: 72px;

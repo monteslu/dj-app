@@ -147,6 +147,14 @@ export interface DjApi {
   /** Track ids with no generated stems yet (for the stem-generation queue). */
   libraryStemless: (limit?: number) => Promise<number[]>;
   libraryIncrementPlay: (id: number) => Promise<void>;
+  // playlists
+  libraryPlaylists: () => Promise<Array<{ id: number; name: string; hidden: number }>>;
+  libraryPlaylistTracks: (id: number) => Promise<LibTrack[]>;
+  libraryCreatePlaylist: (name: string) => Promise<number>;
+  libraryAddToPlaylist: (plId: number, trackId: number) => Promise<void>;
+  libraryRemoveFromPlaylist: (plId: number, trackId: number) => Promise<void>;
+  libraryRenamePlaylist: (plId: number, name: string) => Promise<void>;
+  libraryDeletePlaylist: (plId: number) => Promise<void>;
   /** Save generated .stem.mp4 bytes next to the track + link it. Returns the path. */
   saveStems: (id: number, data: ArrayBuffer) => Promise<string | null>;
 

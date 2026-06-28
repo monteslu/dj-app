@@ -39,8 +39,8 @@ function pruneFiles(dir, match) {
 const desktop = join(dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = join(desktop, '..', '..');
 const out = join(desktop, 'publish');
-// Default version; CI overrides with the git tag, e.g. `node make-publish-package.mjs 0.2.0`.
-const version = process.argv[2] || '0.1.0';
+// Default version; CI overrides with the git tag, e.g. `node make-publish-package.mjs 0.3.0`.
+const version = process.argv[2] || '0.2.0';
 
 // Ensure the build ran.
 for (const d of ['dist-main', 'dist-renderer', 'resources']) {

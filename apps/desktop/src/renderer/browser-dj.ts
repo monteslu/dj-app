@@ -134,6 +134,15 @@ export function makeBrowserDj(): DjApi {
     libraryReanalyzeAll: async () => 0,
     libraryStemless: async () => [],
     libraryIncrementPlay: async () => {},
+    // playlists — the web demo uses a simpler in-session model (no SQLite); these are no-op
+    // stubs for now so the shared DjApi type is satisfied.
+    libraryPlaylists: async () => [],
+    libraryPlaylistTracks: async () => [],
+    libraryCreatePlaylist: async () => 0,
+    libraryAddToPlaylist: async () => {},
+    libraryRemoveFromPlaylist: async () => {},
+    libraryRenamePlaylist: async () => {},
+    libraryDeletePlaylist: async () => {},
     saveStems: async () => null,
     saveRecording: async () => null,
     trackCover: async () => null,

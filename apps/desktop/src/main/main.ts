@@ -503,6 +503,21 @@ ipcMain.handle(
 
 ipcMain.handle('library:crates', () => getLibrary().listCrates());
 ipcMain.handle('library:crateTracks', (_e, id: number) => getLibrary().crateTracks(id));
+
+// ── Playlists ────────────────────────────────────────────────────────────────
+ipcMain.handle('library:playlists', () => getLibrary().db.listPlaylists());
+ipcMain.handle('library:playlistTracks', (_e, id: number) => getLibrary().db.playlistTracks(id));
+ipcMain.handle('library:createPlaylist', (_e, name: string) => getLibrary().db.createPlaylist(name));
+ipcMain.handle('library:addToPlaylist', (_e, plId: number, trackId: number) =>
+  getLibrary().db.addToPlaylist(plId, trackId),
+);
+ipcMain.handle('library:removeFromPlaylist', (_e, plId: number, trackId: number) =>
+  getLibrary().db.removeFromPlaylist(plId, trackId),
+);
+ipcMain.handle('library:renamePlaylist', (_e, plId: number, name: string) =>
+  getLibrary().db.renamePlaylist(plId, name),
+);
+ipcMain.handle('library:deletePlaylist', (_e, plId: number) => getLibrary().db.deletePlaylist(plId));
 ipcMain.handle(
   'library:setAnalysis',
   (

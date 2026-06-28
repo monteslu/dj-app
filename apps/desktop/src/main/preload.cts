@@ -61,6 +61,16 @@ const api: DjApi = {
   libraryUnanalyzed: (limit) => electron.ipcRenderer.invoke('library:unanalyzed', limit),
   libraryReanalyzeAll: () => electron.ipcRenderer.invoke('library:reanalyzeAll'),
   libraryStemless: (limit) => electron.ipcRenderer.invoke('library:stemless', limit),
+  // playlists
+  libraryPlaylists: () => electron.ipcRenderer.invoke('library:playlists'),
+  libraryPlaylistTracks: (id) => electron.ipcRenderer.invoke('library:playlistTracks', id),
+  libraryCreatePlaylist: (name) => electron.ipcRenderer.invoke('library:createPlaylist', name),
+  libraryAddToPlaylist: (plId, trackId) =>
+    electron.ipcRenderer.invoke('library:addToPlaylist', plId, trackId),
+  libraryRemoveFromPlaylist: (plId, trackId) =>
+    electron.ipcRenderer.invoke('library:removeFromPlaylist', plId, trackId),
+  libraryRenamePlaylist: (plId, name) => electron.ipcRenderer.invoke('library:renamePlaylist', plId, name),
+  libraryDeletePlaylist: (plId) => electron.ipcRenderer.invoke('library:deletePlaylist', plId),
   libraryIncrementPlay: (id) => electron.ipcRenderer.invoke('library:incrementPlay', id),
   saveStems: (id, data) => electron.ipcRenderer.invoke('stems:save', id, data),
   saveRecording: (wav) => electron.ipcRenderer.invoke('recording:save', wav),

@@ -15,6 +15,8 @@ import { LibraryControl } from '../library-control.js';
 import { useColumns, type ColumnId } from '../library-columns.js';
 import { getDeckTrack } from '../deck-state.js';
 import { RowWaveform } from './RowWaveform.js';
+import { ContextMenu, type ContextMenuState, type MenuItem } from './ContextMenu.js';
+import { usePrompt } from './PromptModal.js';
 
 // Resizable columns, in table order. `sort` is the SortCol they sort by (null = no sort).
 const COLUMNS: { id: ColumnId; label: string; sort: SortCol | null }[] = [
@@ -97,6 +99,25 @@ export function Library(): React.JSX.Element {
 
   const [dbError, setDbError] = useState<string | null>(null);
 
+  // Playlists: the sidebar list + which one is active (null = All Tracks). When a playlist is
+  // active, refresh() loads its tracks (in playlist order) instead of the full library query.
+  const [playlists, setPlaylists] = useState<Array<{ id: number; name: string; hidden: number }>>([]);
+  const [activePlaylist, setActivePlaylist] = useState<number | null>(null);
+  const [ctxMenu, setCtxMenu] = useState<ContextMenuState | null>(null);
+  const { prompt, modal: promptModal } = usePrompt();
+
+  const loadPlaylists = useCallback(async () => {
+    if (!window.dj?.libraryPlaylists) return;
+    try {
+      setPlaylists(await window.dj.libraryPlaylists());
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  useEffect(() => {
+    void loadPlaylists();
+  }, [loadPlaylists]);
+
   const refresh = useCallback(async () => {
     if (new URLSearchParams(location.search).has('demo')) {
       setTracks(DEMO_TRACKS);
@@ -107,12 +128,19 @@ export function Library(): React.JSX.Element {
       return;
     }
     try {
-      const rows = await window.dj.libraryQuery({
-        search,
-        sortColumn: sortCol,
-        sortDesc,
-        limit: 500,
-      });
+      let rows: LibTrack[];
+      if (activePlaylist != null && window.dj.libraryPlaylistTracks) {
+        // playlist view — tracks in playlist order; the text search still filters client-side
+        rows = await window.dj.libraryPlaylistTracks(activePlaylist);
+        const q = search.trim().toLowerCase();
+        if (q) {
+          rows = rows.filter((t) =>
+            `${t.artist ?? ''} ${t.title ?? ''} ${t.album ?? ''}`.toLowerCase().includes(q),
+          );
+        }
+      } else {
+        rows = await window.dj.libraryQuery({ search, sortColumn: sortCol, sortDesc, limit: 500 });
+      }
       setTracks(rows);
       setDbError(null);
     } catch (err) {
@@ -122,7 +150,7 @@ export function Library(): React.JSX.Element {
       );
       console.error('library query failed:', err);
     }
-  }, [search, sortCol, sortDesc]);
+  }, [search, sortCol, sortDesc, activePlaylist]);
 
   useEffect(() => {
     void refresh();
@@ -321,9 +349,134 @@ export function Library(): React.JSX.Element {
     [stemQueue, started, start],
   );
 
+  const reanalyzeTrack = useCallback(
+    async (track: LibTrack) => {
+      if (!started) await start();
+      analysisQueue.enqueue([track.id]);
+    },
+    [analysisQueue, started, start],
+  );
+
+  // --- Playlist actions -----------------------------------------------------
+  const addToPlaylist = useCallback(
+    async (trackId: number, playlistId: number) => {
+      await window.dj?.libraryAddToPlaylist?.(playlistId, trackId);
+      if (activePlaylist === playlistId) void refresh(); // showing that playlist → reflect it
+    },
+    [activePlaylist, refresh],
+  );
+
+  const createPlaylistWith = useCallback(
+    async (trackId?: number) => {
+      const name = (await prompt({ title: 'New playlist', placeholder: 'Playlist name', okLabel: 'Create' }))?.trim();
+      if (!name) return;
+      const id = await window.dj?.libraryCreatePlaylist?.(name);
+      if (id && trackId != null) await window.dj?.libraryAddToPlaylist?.(id, trackId);
+      await loadPlaylists();
+    },
+    [loadPlaylists, prompt],
+  );
+
+  const removeFromActivePlaylist = useCallback(
+    async (trackId: number) => {
+      if (activePlaylist == null) return;
+      await window.dj?.libraryRemoveFromPlaylist?.(activePlaylist, trackId);
+      void refresh();
+    },
+    [activePlaylist, refresh],
+  );
+
+  const renameActivePlaylist = useCallback(async () => {
+    if (activePlaylist == null) return;
+    const cur = playlists.find((p) => p.id === activePlaylist)?.name ?? '';
+    const name = (await prompt({ title: 'Rename playlist', initial: cur, okLabel: 'Rename' }))?.trim();
+    if (!name) return;
+    await window.dj?.libraryRenamePlaylist?.(activePlaylist, name);
+    await loadPlaylists();
+  }, [activePlaylist, playlists, loadPlaylists, prompt]);
+
+  const deleteActivePlaylist = useCallback(async () => {
+    if (activePlaylist == null) return;
+    const name = playlists.find((p) => p.id === activePlaylist)?.name ?? 'this playlist';
+    const ok = await prompt({
+      title: `Delete "${name}"? Tracks stay in your library.`,
+      confirm: true,
+      okLabel: 'Delete',
+    });
+    if (!ok) return;
+    await window.dj?.libraryDeletePlaylist?.(activePlaylist);
+    setActivePlaylist(null);
+    await loadPlaylists();
+  }, [activePlaylist, playlists, loadPlaylists, prompt]);
+
+  // --- Right-click context menu --------------------------------------------
+  const openRowMenu = useCallback(
+    (e: React.MouseEvent, t: LibTrack, i: number) => {
+      e.preventDefault();
+      setSelected(t.id);
+      bus.set(LIBRARY, LibraryKeys.selectedIndex, i);
+      const bpm = t.bpm ?? 0;
+      const playlistItems: MenuItem[] = [
+        { label: 'New playlist…', icon: '＋', onClick: () => void createPlaylistWith(t.id) },
+        ...(playlists.length ? [{ separator: true } as MenuItem] : []),
+        ...playlists.map((p) => ({ label: p.name, onClick: () => void addToPlaylist(t.id, p.id) })),
+      ];
+      const items: MenuItem[] = [
+        ...Array.from({ length: NUM_DECKS }, (_, d) => ({
+          label: `Load to Deck ${d + 1}`,
+          icon: '▶',
+          onClick: () => void loadToDeck(t, d),
+        })),
+        { separator: true },
+        { label: 'Add to Playlist', icon: '☰', items: playlistItems },
+        ...(activePlaylist != null
+          ? [
+              {
+                label: 'Remove from this playlist',
+                icon: '✕',
+                onClick: () => void removeFromActivePlaylist(t.id),
+              } as MenuItem,
+            ]
+          : []),
+        { separator: true },
+        {
+          label: 'Adjust BPM',
+          icon: '♩',
+          items: [
+            { label: `Double  (${bpm ? Math.round(bpm * 2) : '—'})`, disabled: !bpm, onClick: () => void updateRowBpm(t.id, bpm * 2) },
+            { label: `Halve  (${bpm ? Math.round(bpm / 2) : '—'})`, disabled: !bpm, onClick: () => void updateRowBpm(t.id, bpm / 2) },
+            { label: `×2/3  (${bpm ? Math.round((bpm * 2) / 3) : '—'})`, disabled: !bpm, onClick: () => void updateRowBpm(t.id, (bpm * 2) / 3) },
+            { label: `×3/4  (${bpm ? Math.round((bpm * 3) / 4) : '—'})`, disabled: !bpm, onClick: () => void updateRowBpm(t.id, (bpm * 3) / 4) },
+          ],
+        },
+        { label: 'Re-analyze', icon: '↻', onClick: () => void reanalyzeTrack(t) },
+        { separator: true },
+        {
+          label: t.stemPath ? 'Stems generated ✓' : 'Generate stems',
+          icon: '🥁',
+          disabled: !!t.stemPath,
+          onClick: () => void generateStems(t),
+        },
+      ];
+      setCtxMenu({ x: e.clientX, y: e.clientY, items });
+    },
+    [
+      bus,
+      playlists,
+      activePlaylist,
+      loadToDeck,
+      addToPlaylist,
+      createPlaylistWith,
+      removeFromActivePlaylist,
+      updateRowBpm,
+      generateStems,
+      reanalyzeTrack,
+    ],
+  );
+
   // Explicit table width = the two fixed utility cols (WAVE 124 + LOAD 72) + every resizable
   // column's current width. Needed so table-layout:fixed honors the <col> widths (see table JSX).
-  const FIXED_COLS_W = 124 + 72;
+  const FIXED_COLS_W = 112 + 72;
   const tableWidth = FIXED_COLS_W + COLUMNS.reduce((sum, c) => sum + (widths[c.id] ?? 0), 0);
 
   const toggleSort = (col: SortCol) => {
@@ -379,6 +532,50 @@ export function Library(): React.JSX.Element {
         )}
         {dbError && <span className="library-error">{dbError}</span>}
       </div>
+
+      <div className="library-body">
+        <aside className="playlist-sidebar" aria-label="Playlists">
+          <button
+            className={`pl-item${activePlaylist === null ? ' active' : ''}`}
+            onClick={() => setActivePlaylist(null)}
+          >
+            <span className="pl-icon">♫</span> All Tracks
+          </button>
+          <div className="pl-heading">
+            <span>Playlists</span>
+            <button className="pl-add" title="New playlist" onClick={() => void createPlaylistWith()}>
+              ＋
+            </button>
+          </div>
+          {playlists.length === 0 && <div className="pl-empty">No playlists yet</div>}
+          {playlists.map((p) => (
+            <button
+              key={p.id}
+              className={`pl-item${activePlaylist === p.id ? ' active' : ''}`}
+              onClick={() => setActivePlaylist(p.id)}
+              onDragOver={(e) => {
+                if (e.dataTransfer.types.includes('application/x-dj-track-id')) e.preventDefault();
+              }}
+              onDrop={(e) => {
+                const id = Number(e.dataTransfer.getData('application/x-dj-track-id'));
+                if (id) void addToPlaylist(id, p.id);
+              }}
+              title="Click to view · drop a track here to add"
+            >
+              <span className="pl-icon">☰</span> {p.name}
+            </button>
+          ))}
+          {activePlaylist !== null && (
+            <div className="pl-actions">
+              <button onClick={() => void renameActivePlaylist()} title="Rename this playlist">
+                ✎ rename
+              </button>
+              <button onClick={() => void deleteActivePlaylist()} title="Delete this playlist">
+                🗑 delete
+              </button>
+            </div>
+          )}
+        </aside>
 
       <div className="library-table-wrap">
         <table
@@ -443,7 +640,8 @@ export function Library(): React.JSX.Element {
                   bus.set(LIBRARY, LibraryKeys.selectedIndex, i);
                 }}
                 onDoubleClick={() => void loadToDeck(t, firstStoppedDeck())}
-                title="Double-click → first stopped deck · drag onto a deck · or use the deck buttons →"
+                onContextMenu={(e) => openRowMenu(e, t, i)}
+                title="Double-click → first stopped deck · right-click for more · drag onto a deck"
               >
                 <td className="td-wave">
                   <RowWaveform
@@ -486,6 +684,9 @@ export function Library(): React.JSX.Element {
           </tbody>
         </table>
       </div>
+      </div>
+      <ContextMenu state={ctxMenu} onClose={() => setCtxMenu(null)} />
+      {promptModal}
     </section>
   );
 }

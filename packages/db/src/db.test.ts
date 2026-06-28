@@ -202,13 +202,46 @@ describe('LibraryDb', () => {
     expect(db.crateTracks(crate)).toHaveLength(2);
   });
 
-  it('manages playlists with ordering', () => {
-    const t1 = addTrack({ location: '/m/p1.mp3' });
-    const t2 = addTrack({ location: '/m/p2.mp3' });
-    const pl = db.createPlaylist('Set 1');
-    db.addToPlaylist(pl, t1);
-    db.addToPlaylist(pl, t2);
-    expect(db.listPlaylists()).toHaveLength(1);
+  it('playlists: create, list, add tracks IN ORDER', () => {
+    const a = addTrack({ location: '/m/a.mp3', title: 'a' });
+    const b = addTrack({ location: '/m/b.mp3', title: 'b' });
+    const c = addTrack({ location: '/m/c.mp3', title: 'c' });
+    const pl = db.createPlaylist('My Set');
+    expect(db.listPlaylists().map((p) => p.name)).toContain('My Set');
+    // add out of alphabetical order → playlist order is INSERTION order, not name
+    db.addToPlaylist(pl, c);
+    db.addToPlaylist(pl, a);
+    db.addToPlaylist(pl, b);
+    expect(db.playlistTracks(pl).map((t) => t.id)).toEqual([c, a, b]);
+  });
+
+  it('playlists: remove closes the position gap', () => {
+    const a = addTrack({ location: '/m/a.mp3', title: 'a' });
+    const b = addTrack({ location: '/m/b.mp3', title: 'b' });
+    const c = addTrack({ location: '/m/c.mp3', title: 'c' });
+    const pl = db.createPlaylist('Set');
+    [a, b, c].forEach((id) => db.addToPlaylist(pl, id));
+    db.removeFromPlaylist(pl, b);
+    expect(db.playlistTracks(pl).map((t) => t.id)).toEqual([a, c]);
+    const d = addTrack({ location: '/m/d.mp3', title: 'd' });
+    db.addToPlaylist(pl, d); // appends at the contiguous end
+    expect(db.playlistTracks(pl).map((t) => t.id)).toEqual([a, c, d]);
+  });
+
+  it('playlists: reorder moves a track and shifts the rest', () => {
+    const ids = ['a', 'b', 'c', 'd'].map((t) => addTrack({ location: `/m/${t}.mp3`, title: t }));
+    const pl = db.createPlaylist('Set');
+    ids.forEach((id) => db.addToPlaylist(pl, id));
+    db.reorderPlaylistTrack(pl, 1, 3); // move pos1 (a) to pos3 → b,c,a,d
+    expect(db.playlistTracks(pl).map((t) => t.id)).toEqual([ids[1], ids[2], ids[0], ids[3]]);
+  });
+
+  it('playlists: rename and delete', () => {
+    const pl = db.createPlaylist('Old');
+    db.renamePlaylist(pl, 'New');
+    expect(db.listPlaylists().find((p) => p.id === pl)?.name).toBe('New');
+    db.deletePlaylist(pl);
+    expect(db.listPlaylists().find((p) => p.id === pl)).toBeUndefined();
   });
 
   it('increments play count', () => {
