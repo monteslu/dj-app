@@ -22,3 +22,9 @@ createRoot(root).render(
     <App />
   </StrictMode>,
 );
+// Startup timing: attribute a slow black-screen on launch (bundle eval vs paint).
+requestAnimationFrame(() => {
+  const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
+  const sinceNav = nav ? performance.now() - nav.startTime : performance.now();
+  console.log(`[perf] first frame at ${sinceNav.toFixed(0)}ms since navigation start`);
+});
