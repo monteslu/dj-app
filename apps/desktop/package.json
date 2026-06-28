@@ -5,6 +5,9 @@
   "type": "module",
   "description": "The MochaMix Electron app.",
   "main": "dist-main/main.js",
+  "bin": {
+    "mochamix": "bin/mochamix.mjs"
+  },
   "scripts": {
     "build:renderer": "vite build",
     "build:worklet": "vite build --config vite.worklet.config.ts",

@@ -12,9 +12,29 @@
  * Usage: node scripts/make-publish-package.mjs [version]
  */
 
-import { cpSync, mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import {
+  cpSync,
+  mkdirSync,
+  rmSync,
+  writeFileSync,
+  readFileSync,
+  existsSync,
+  readdirSync,
+  statSync,
+  unlinkSync,
+} from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+/** Recursively delete files matching a predicate (used to strip sourcemaps + type decls
+ *  from the publish output — useless to `npx mochamix` end-users + leak the original source). */
+function pruneFiles(dir, match) {
+  for (const entry of readdirSync(dir)) {
+    const p = join(dir, entry);
+    if (statSync(p).isDirectory()) pruneFiles(p, match);
+    else if (match(entry)) unlinkSync(p);
+  }
+}
 
 const desktop = join(dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = join(desktop, '..', '..');
@@ -36,6 +56,10 @@ mkdirSync(out, { recursive: true });
 for (const d of ['dist-main', 'dist-renderer', 'resources', 'bin']) {
   cpSync(join(desktop, d), join(out, d), { recursive: true });
 }
+// Strip sourcemaps + emitted type declarations from the shipped build — they bloat the
+// package, are useless to end-users running the app, and the .map files embed the full
+// original source (sourcesContent). The source lives on GitHub for contributors.
+pruneFiles(out, (f) => f.endsWith('.map') || f.endsWith('.d.ts') || f.endsWith('.d.cts'));
 for (const f of ['README.md', 'LICENSE']) {
   if (existsSync(join(repoRoot, f))) cpSync(join(repoRoot, f), join(out, f));
 }
