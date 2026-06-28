@@ -108,6 +108,9 @@ export function makeBrowserDj(): DjApi {
     displayOpen: async () => false,
     displaySend: () => {},
     onDisplayFrame: () => () => {},
+    // Web build: the stem worker fetches the model from the CDN itself; no pre-download step.
+    ensureStemModel: async () => {},
+    onStemModelProgress: () => () => {},
     controllersList: async () => [],
     controllersReadFile: async () => null,
     userControllersList: async () => [],

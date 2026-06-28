@@ -96,6 +96,10 @@ export interface DjApi {
   displaySend: (frame: unknown) => void;
   /** Display side: receive output-bus frames. Returns an unsubscribe fn. */
   onDisplayFrame: (cb: (frame: unknown) => void) => () => void;
+  /** Ensure the stem-separation model is downloaded (one-time, ~80MB) before generating. */
+  ensureStemModel: () => Promise<void>;
+  /** Subscribe to model-download byte progress; returns an unsubscribe fn. */
+  onStemModelProgress: (cb: (p: { received: number; total: number }) => void) => () => void;
   /** The bundled Mixxx controller mappings (picker index). */
   controllersList: () => Promise<Array<{ file: string; name: string; author: string }>>;
   /** Read one bundled controller file's text (mapping .xml or referenced .js), or null. */

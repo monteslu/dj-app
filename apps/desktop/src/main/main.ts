@@ -22,7 +22,7 @@ import { existsSync, cpSync, renameSync, writeFileSync, statSync } from 'node:fs
 import { dirname, join, normalize, basename, extname } from 'node:path';
 import { LibraryService } from './library-service.js';
 import type { QueryOptions } from '@dj/db';
-import { isWebGpuPath, resolveWebGpuPath } from '@dj/stems/asset-server';
+import { isWebGpuPath, resolveWebGpuPath, ensureModel } from '@dj/stems/asset-server';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // main.js (esbuild-bundled) lives at dist-main/main.js → renderer is one up.
@@ -347,6 +347,18 @@ function getLibrary(): LibraryService {
 
 ipcMain.handle('library:query', (_e, opts: QueryOptions) => getLibrary().query(opts));
 ipcMain.handle('library:count', (_e, search?: string) => getLibrary().count(search));
+
+// ── Stem model: download (with progress) before generation ───────────────────
+// The ~80MB htdemucs model downloads once on first use. Called before generating so the
+// renderer can show a "downloading model" indicator; streams byte progress back to the
+// caller via 'stems:modelProgress'. Resolves immediately if already cached.
+ipcMain.handle('stems:ensureModel', async (e) => {
+  await ensureModel((received, total) => {
+    if (!e.sender.isDestroyed()) {
+      e.sender.send('stems:modelProgress', { received, total });
+    }
+  });
+});
 
 // ── Visual display windows (the output-bus consumer side) ────────────────────
 // dj-app emits data; a popup display window renders the visuals. The main process

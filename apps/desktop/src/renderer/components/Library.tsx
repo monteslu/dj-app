@@ -371,7 +371,10 @@ export function Library(): React.JSX.Element {
         )}
         {stemStatus.remaining > 0 && (
           <span className="library-stemming" title="Generating stems in the background">
-            <span className="spin" /> stems processing {stemStatus.remaining} left
+            <span className="spin" />{' '}
+            {stemStatus.phase === 'downloading'
+              ? `downloading AI model (one-time)… ${Math.round(stemStatus.progress * 100)}%`
+              : `stems processing ${stemStatus.remaining} left`}
           </span>
         )}
         {dbError && <span className="library-error">{dbError}</span>}
@@ -583,10 +586,20 @@ function StemCell({
 
   if (generating) {
     const pct = Math.round(status.progress * 100);
+    const downloading = status.phase === 'downloading';
     return (
-      <div className="stem-progress" title={`${status.phase ?? ''} ${pct}%`}>
+      <div
+        className="stem-progress"
+        title={
+          downloading
+            ? `Downloading the AI stem model (one-time, ~80 MB) — ${pct}%`
+            : `${status.phase ?? ''} ${pct}%`
+        }
+      >
         <div className="stem-progress-bar" style={{ width: `${pct}%` }} />
-        <span className="stem-progress-label">{pct}%</span>
+        <span className="stem-progress-label">
+          {downloading ? `model ${pct}%` : `${pct}%`}
+        </span>
       </div>
     );
   }

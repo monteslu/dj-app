@@ -28,6 +28,13 @@ const api: DjApi = {
     electron.ipcRenderer.on('display:frame', listener);
     return () => electron.ipcRenderer.removeListener('display:frame', listener);
   },
+  // Stem model: ensure the htdemucs model is downloaded (with progress) before generating.
+  ensureStemModel: () => electron.ipcRenderer.invoke('stems:ensureModel'),
+  onStemModelProgress: (cb) => {
+    const listener = (_e: unknown, p: { received: number; total: number }) => cb(p);
+    electron.ipcRenderer.on('stems:modelProgress', listener);
+    return () => electron.ipcRenderer.removeListener('stems:modelProgress', listener);
+  },
   controllersList: () => electron.ipcRenderer.invoke('controllers:list'),
   controllersReadFile: (filename) => electron.ipcRenderer.invoke('controllers:readFile', filename),
   userControllersList: () => electron.ipcRenderer.invoke('userControllers:list'),

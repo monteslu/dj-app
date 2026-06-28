@@ -22,8 +22,8 @@ export { separateStems, detectWebGpu, encodeWav, encodeWavToAac, disposeAacEncod
 export type { SeparatedStems, StemName };
 
 export interface GenerateProgress {
-  /** Coarse stage label. */
-  phase: 'separating' | 'encoding' | 'muxing' | 'done';
+  /** Coarse stage label. 'downloading' = one-time model fetch before the first separation. */
+  phase: 'downloading' | 'separating' | 'encoding' | 'muxing' | 'done';
   /** Overall 0..1. */
   progress: number;
   log?: string;

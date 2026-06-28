@@ -70,7 +70,15 @@ function cacheDir(): string {
   return current;
 }
 
-function download(url: string, destPath: string, redirects = 5): Promise<void> {
+/** Reports bytes received / total (total may be 0 if the server omits content-length). */
+export type DownloadProgress = (received: number, total: number) => void;
+
+function download(
+  url: string,
+  destPath: string,
+  redirects = 5,
+  onProgress?: DownloadProgress,
+): Promise<void> {
   return new Promise((resolve, reject) => {
     mkdirSync(dirname(destPath), { recursive: true });
     const req = https.get(url, (res) => {
@@ -81,13 +89,21 @@ function download(url: string, destPath: string, redirects = 5): Promise<void> {
         const next = res.headers.location.startsWith('http')
           ? res.headers.location
           : new URL(res.headers.location, url).href;
-        download(next, destPath, redirects - 1).then(resolve, reject);
+        download(next, destPath, redirects - 1, onProgress).then(resolve, reject);
         return;
       }
       if (code !== 200) {
         res.resume();
         reject(new Error(`HTTP ${code} for ${url}`));
         return;
+      }
+      const total = parseInt(res.headers['content-length'] ?? '0', 10) || 0;
+      let received = 0;
+      if (onProgress) {
+        res.on('data', (chunk: Buffer) => {
+          received += chunk.length;
+          onProgress(received, total);
+        });
       }
       const tmp = `${destPath}.part`;
       const out = createWriteStream(tmp);
@@ -106,6 +122,17 @@ function download(url: string, destPath: string, redirects = 5): Promise<void> {
     });
     req.on('error', reject);
   });
+}
+
+/**
+ * Ensure the stem-separation model is cached, reporting download progress. Called BEFORE
+ * generation so the UI can show a "downloading model (one-time)" indicator instead of a
+ * stuck 0% bar. No-op (resolves immediately) if already cached.
+ */
+export async function ensureModel(onProgress?: DownloadProgress): Promise<void> {
+  const dest = join(cacheDir(), 'models', 'htdemucs.onnx');
+  if (existsSync(dest) && statSync(dest).size > 0) return; // already downloaded
+  await download(HTDEMUCS_URL, dest, 5, onProgress);
 }
 
 /**

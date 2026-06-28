@@ -99,6 +99,9 @@ export class StemQueue {
         this.status.remaining = this.queue.length + 1;
         this.emit();
         try {
+          // First use: make sure the ~80MB stem model is downloaded, surfacing byte progress
+          // so the row shows "downloading model" instead of a stuck 0% bar. No-op if cached.
+          await this.ensureModelWithProgress();
           await this.generateOne(id);
           this.status.done.add(id);
         } catch (e) {
@@ -113,6 +116,30 @@ export class StemQueue {
       this.status.phase = null;
       this.status.remaining = 0;
       this.running = false;
+      this.emit();
+    }
+  }
+
+  /** Download the stem model if needed, reflecting byte progress in the queue status as a
+   *  'downloading' phase. Resolves immediately (no phase change) when already cached. */
+  private async ensureModelWithProgress(): Promise<void> {
+    if (!window.dj?.ensureStemModel) return; // web build / no bridge → worker handles it
+    let sawProgress = false;
+    const off = window.dj.onStemModelProgress(({ received, total }) => {
+      sawProgress = true;
+      this.status.phase = 'downloading';
+      this.status.progress = total > 0 ? received / total : 0;
+      this.emit();
+    });
+    try {
+      await window.dj.ensureStemModel();
+    } finally {
+      off();
+    }
+    if (sawProgress) {
+      // download finished → reset to the separating phase for the actual work
+      this.status.phase = 'separating';
+      this.status.progress = 0;
       this.emit();
     }
   }
