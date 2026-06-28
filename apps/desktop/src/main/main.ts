@@ -56,9 +56,10 @@ app.setName('dj-app');
 // commandLine switch alone is read too late on a Wayland session).
 app.commandLine.appendSwitch('enable-unsafe-webgpu');
 app.commandLine.appendSwitch('enable-features', 'Vulkan');
-if (process.platform === 'linux') {
-  app.commandLine.appendSwitch('ozone-platform', 'x11');
-}
+// NOTE: do NOT force ozone-platform=x11 here. On a Wayland session that forces the
+// window to present via XWayland and FAILS ("GetGeometry failed for window 1" → no
+// window). Keep the window on the auto-picked (Wayland) ozone; WebGPU/Vulkan COMPUTE
+// works regardless (the adapter is available on Wayland too — verified on this box).
 
 // Frame pacing. By DEFAULT we leave Chromium's normal vsync in place: rAF fires once
 // per display refresh (60/120Hz), which is smooth, tear-free, and renders exactly the
