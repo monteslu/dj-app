@@ -359,6 +359,17 @@ export function Library(): React.JSX.Element {
   // decode; enqueue is one-at-a-time (GPU-heavy). The row shows live progress.
   const generateStems = useCallback(
     async (track: LibTrack) => {
+      // Web demo only: the browser is more constrained than the desktop app, so warn once
+      // that live separation is heavy (confirm() works in a real browser; in Electron we
+      // skip it since renderers don't support it and the desktop handles separation fine).
+      const isWeb = (window as unknown as { __DJ_WEB__?: boolean }).__DJ_WEB__ === true;
+      if (isWeb && !sessionStorage.getItem('stem-perf-warned')) {
+        sessionStorage.setItem('stem-perf-warned', '1');
+        const ok = window.confirm(
+          'Generating stems runs an AI model in your browser. It downloads a ~80 MB model the first time and uses a lot of GPU/CPU, so playback may stutter while it runs. Continue?',
+        );
+        if (!ok) return;
+      }
       if (!started) {
         await start();
       }
