@@ -6,7 +6,7 @@
  */
 
 import { createRoot } from 'react-dom/client';
-import { makeBrowserDj } from './browser-dj.js';
+import { makeBrowserDj, loadDemoLibrary } from './browser-dj.js';
 
 // Self-heal: a stale service worker from a PREVIOUS app on this localhost port can
 // hijack our pages (serving cached, wrong assets). We never register one, so kill
@@ -21,8 +21,10 @@ if ('serviceWorker' in navigator) {
 // In Electron we disable that policy and auto-start. (absent = Electron)
 (window as unknown as { __DJ_WEB__?: boolean }).__DJ_WEB__ = true;
 
-// Install the IPC stub first so anything reading window.dj at import time is safe.
-window.dj = makeBrowserDj();
+// Load the bundled pre-processed demo songs (if deployed), then install the browser DjApi
+// backed by them. Falls back to synth tracks when the manifest isn't present (e.g. e2e).
+const demo = await loadDemoLibrary();
+window.dj = makeBrowserDj(demo);
 
 // Dynamic import so window.dj is set before App's module graph evaluates.
 const { App } = await import('./App.js');

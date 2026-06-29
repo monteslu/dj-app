@@ -1,0 +1,57 @@
+{
+  "_about": "Pre-processed demo tracks for the web demo. Each is a 4-stem .stem.mp4 (already separated + analyzed) so the demo loads instantly with no live separation. Source: blocSonic netBloc Vol. 24 (CC). See LICENSES.md.",
+  "tracks": [
+    {
+      "id": 1,
+      "artist": "Eclectek",
+      "title": "We Are Going To Eclecfunk Your Ass",
+      "album": "netBloc Vol. 24",
+      "genre": "Funk",
+      "bpm": 104.5,
+      "key": "6B",
+      "duration": 190,
+      "firstBeatFrame": 10496,
+      "stemFile": "eclectek-eclecfunk.stem.mp4",
+      "license": "CC BY-NC-SA 3.0"
+    },
+    {
+      "id": 2,
+      "artist": "60 Tigres",
+      "title": "Garage",
+      "album": "netBloc Vol. 24",
+      "genre": "Rock",
+      "bpm": 125.03,
+      "key": "9A",
+      "duration": 245,
+      "firstBeatFrame": 12032,
+      "stemFile": "60tigres-garage.stem.mp4",
+      "license": "CC BY-NC-SA 2.5"
+    },
+    {
+      "id": 3,
+      "artist": "Entertainment For The Braindead",
+      "title": "Resolutions (Chris Summer Remix)",
+      "album": "netBloc Vol. 24",
+      "genre": "Electronic",
+      "bpm": 128,
+      "key": "8B",
+      "duration": 314,
+      "firstBeatFrame": 3328,
+      "stemFile": "entertainment-resolutions.stem.mp4",
+      "license": "CC BY-NC-SA 3.0"
+    },
+    {
+      "id": 4,
+      "artist": "Juanitos",
+      "title": "Hola Hola Bossa Nova",
+      "album": "netBloc Vol. 24",
+      "genre": "Bossa Nova",
+      "bpm": 149.83,
+      "key": "12B",
+      "duration": 207,
+      "firstBeatFrame": 7424,
+      "stemFile": "juanitos-holahola.stem.mp4",
+      "license": "CC BY 2.0"
+    }
+  ]
+}

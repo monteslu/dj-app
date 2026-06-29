@@ -1,0 +1,37 @@
+# Netlify deploy for the MochaMix web demo (web.mochamix.org).
+# Builds the standalone browser bundle and publishes it with the cross-origin-isolation
+# headers the audio engine needs (SharedArrayBuffer requires COOP+COEP).
+
+[build]
+  # npm workspaces install from the repo root, then build the browser target.
+  command = "npm ci && npm run build:web --workspace apps/desktop"
+  publish = "apps/desktop/dist-browser"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# Cross-origin isolation for the whole site (SharedArrayBuffer / the AudioWorklet engine).
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Cross-Origin-Opener-Policy = "same-origin"
+    Cross-Origin-Embedder-Policy = "require-corp"
+
+# The bundled demo stems + WebGPU assets are same-origin here, but set CORP so any
+# cross-origin embedding (and the require-corp policy) is satisfied.
+[[headers]]
+  for = "/demo-songs/*"
+  [headers.values]
+    Cross-Origin-Resource-Policy = "cross-origin"
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# SPA-ish: the demo is a single page; send everything to browser.html.
+[[redirects]]
+  from = "/*"
+  to = "/browser.html"
+  status = 200

@@ -24,13 +24,68 @@ function track(
 }
 // The first two map to real MP3s served at /mp3/<file> (vite.browser serveMusic),
 // so the web build + e2e exercise actual decode/analysis/scrolling waveforms. The
-// rest are synthetic. mp3File!=null marks the real ones.
+// rest are synthetic. mp3File!=null marks the real ones. Used as the FALLBACK library
+// when the demo manifest isn't present (e.g. Playwright e2e against the dev server).
 const DEMO_TRACKS: Array<LibTrack & { mp3File?: string }> = [
   { ...track(1, 'The Who', "I Can't Explain", '', 'Rock', 0, '', 125), mp3File: "The Who - I Can't Explain.mp3" },
   { ...track(2, 'Bill Withers', "Ain't No Sunshine", '', 'Soul', 0, '', 125), mp3File: 'Bill Withers - Ain\'t No Sunshine.mp3' },
   track(3, 'Tycho', 'Awake', 'Awake', 'Ambient', 115, '11B', 320),
   track(4, 'Jon Hopkins', 'Emerald Rush', 'Singularity', 'Techno', 126, '4A', 365),
 ];
+
+/** A bundled demo track (pre-processed .stem.mp4). `stemFile` points under /demo-songs/. */
+interface DemoManifestTrack {
+  id: number;
+  artist: string;
+  title: string;
+  album: string;
+  genre: string;
+  bpm: number;
+  key: string;
+  duration: number;
+  firstBeatFrame: number;
+  stemFile: string;
+}
+
+/** Load the bundled demo library (public/demo-songs/manifest.json). Returns the LibTrack
+ * rows + a map id→stem URL. Empty if the manifest isn't deployed (then we fall back to the
+ * synth DEMO_TRACKS). */
+export async function loadDemoLibrary(): Promise<{ rows: LibTrack[]; stemUrl: Map<number, string> }> {
+  const stemUrl = new Map<number, string>();
+  try {
+    const res = await fetch('/demo-songs/manifest.json');
+    if (!res.ok) return { rows: [], stemUrl };
+    const data = (await res.json()) as { tracks: DemoManifestTrack[] };
+    const rows = data.tracks.map((t): LibTrack => {
+      stemUrl.set(t.id, `/demo-songs/${t.stemFile}`);
+      return {
+        id: t.id,
+        location: `/demo-songs/${t.stemFile}`,
+        filename: t.stemFile,
+        artist: t.artist,
+        title: t.title,
+        album: t.album,
+        genre: t.genre,
+        year: null,
+        duration: t.duration,
+        bitrate: null,
+        bpm: t.bpm,
+        firstBeatFrame: t.firstBeatFrame,
+        key: t.key,
+        rating: 0,
+        timesPlayed: 0,
+        filetype: 'stem.mp4',
+        dateAdded: '2026-01-01 12:00:00',
+        // pre-processed: stems already exist, so the row shows "✓ stems" and loads instantly
+        stemPath: `/demo-songs/${t.stemFile}`,
+        stemsGeneratedAt: 1,
+      };
+    });
+    return { rows, stemUrl };
+  } catch {
+    return { rows: [], stemUrl };
+  }
+}
 
 // Generate a musical-ish stereo PCM track (kick pattern + harmonic content) so
 // decode → peaks → waveform produces a real, colorful render. 16-bit WAV bytes.
@@ -67,11 +122,58 @@ function synthWav(seconds: number, bpm: number, sampleRate = 48000): ArrayBuffer
   return buf;
 }
 
-export function makeBrowserDj(): DjApi {
-  const lib = new Map(DEMO_TRACKS.map((t) => [t.id, t]));
+/** Prompt for an audio file. Prefers the File System Access picker (Chromium); falls back to
+ * a hidden <input type=file> (Safari/Firefox). Resolves null if cancelled. */
+async function pickAudioFile(): Promise<File | null> {
+  const w = window as unknown as {
+    showOpenFilePicker?: (o: unknown) => Promise<Array<{ getFile: () => Promise<File> }>>;
+  };
+  if (w.showOpenFilePicker) {
+    try {
+      const [h] = await w.showOpenFilePicker({
+        types: [{ description: 'Audio', accept: { 'audio/*': ['.mp3', '.m4a', '.flac', '.wav', '.ogg', '.stem.mp4'] } }],
+        multiple: false,
+      });
+      return h ? await h.getFile() : null;
+    } catch {
+      return null; // user cancelled
+    }
+  }
+  return new Promise<File | null>((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'audio/*,.flac,.stem.mp4';
+    input.onchange = () => resolve(input.files?.[0] ?? null);
+    input.oncancel = () => resolve(null);
+    input.click();
+  });
+}
 
-  // Real MP3 (served at /mp3/<file>) when the track has one, else a synth tone.
+export function makeBrowserDj(demo?: { rows: LibTrack[]; stemUrl: Map<number, string> }): DjApi {
+  // Use the bundled pre-processed demo songs when present; otherwise the synth fallback.
+  const useDemo = !!demo && demo.rows.length > 0;
+  const seed: Array<LibTrack & { mp3File?: string }> = useDemo ? demo!.rows : DEMO_TRACKS;
+  const lib = new Map(seed.map((t) => [t.id, t]));
+  const stemUrl = demo?.stemUrl ?? new Map<number, string>();
+  // user-uploaded files (web demo "open your own"), keyed by their synthetic id
+  const uploads = new Map<number, LoadedFile>();
+  let nextUploadId = 100000;
+
+  // Resolve a track to its audio: a bundled .stem.mp4 (pre-separated, loads instantly), a
+  // user upload, a real served MP3, or a synth tone (fallback).
   const fileFor = async (t: LibTrack & { mp3File?: string }): Promise<LoadedFile> => {
+    if (uploads.has(t.id)) return uploads.get(t.id)!;
+    const su = stemUrl.get(t.id);
+    if (su) {
+      const res = await fetch(su);
+      return {
+        name: t.filename,
+        path: t.location,
+        data: await res.arrayBuffer(),
+        isStem: true,
+        meta: { title: t.title ?? undefined, artist: t.artist ?? undefined, key: t.key ?? undefined, bpm: t.bpm, firstBeatFrame: t.firstBeatFrame },
+      };
+    }
     if (t.mp3File) {
       try {
         const res = await fetch(`/mp3/${encodeURIComponent(t.mp3File)}`);
@@ -84,7 +186,24 @@ export function makeBrowserDj(): DjApi {
   };
 
   return {
-    openTrack: async () => fileFor(DEMO_TRACKS[0]!),
+    // Web demo: open your own audio via a file picker. Reads the file in-browser, adds a
+    // library row, and returns it for loading. Uploaded files run live separation if the
+    // user generates stems (with the perf warning).
+    openTrack: async (): Promise<LoadedFile> => {
+      const file = await pickAudioFile();
+      if (!file) return fileFor(seed[0]!); // cancelled → no-op-ish (load the first demo)
+      const data = await file.arrayBuffer();
+      const id = nextUploadId++;
+      const name = file.name.replace(/\.[^.]+$/, '');
+      const loaded: LoadedFile = { name: file.name, path: `upload://${id}`, data };
+      uploads.set(id, loaded);
+      lib.set(id, {
+        ...track(id, name, name, '', '', 0, '', 0),
+        location: `upload://${id}`,
+        filename: file.name,
+      });
+      return loaded;
+    },
     readTrack: async (path: string) => {
       const t = [...lib.values()].find((x) => x.location === path) ?? DEMO_TRACKS[0]!;
       return fileFor(t as LibTrack & { mp3File?: string });
