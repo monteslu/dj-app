@@ -30,8 +30,9 @@
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
-# SPA-ish: the demo is a single page; send everything to browser.html.
+# SPA-ish: the demo is a single page; send unknown paths to the entry. (The build emits
+# index.html, so "/" works directly; this catches deep links.)
 [[redirects]]
   from = "/*"
-  to = "/browser.html"
+  to = "/index.html"
   status = 200

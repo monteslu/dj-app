@@ -51,6 +51,36 @@ function defaultToBrowserHtml(): Plugin {
   };
 }
 
+// On BUILD: (1) emit the entry as index.html (not browser.html) so the static deploy + `vite
+// preview` serve it at "/" with no redirect; (2) copy the pre-built AudioWorklets into the
+// deploy. The worklet bundle is made by vite.worklet.config.ts into dist-renderer/worklets;
+// in dev it's served by a middleware (serveWorklets), but the production deploy needs the
+// files physically present at /worklets/* (the engine fetches ./worklets/engine.worklet.js).
+// Without this the engine can't addModule() and NO track will load.
+function finalizeBrowserBuild(): Plugin {
+  return {
+    name: 'finalize-browser-build',
+    enforce: 'post',
+    async closeBundle() {
+      const { rename, access, cp } = await import('node:fs/promises');
+      const out = fileURLToPath(new URL('./dist-browser/', import.meta.url));
+      try {
+        await access(`${out}browser.html`);
+        await rename(`${out}browser.html`, `${out}index.html`);
+      } catch {
+        /* already index.html or missing */
+      }
+      const worklets = fileURLToPath(new URL('./dist-renderer/worklets', import.meta.url));
+      try {
+        await access(worklets);
+        await cp(worklets, `${out}worklets`, { recursive: true });
+      } catch (e) {
+        console.error('[finalize-browser-build] could not copy worklets (run build:worklet first):', e);
+      }
+    },
+  };
+}
+
 // Serve the pre-built AudioWorklets (dist-renderer/worklets, made by
 // vite.worklet.config.ts) at /worklets/* so the full audio engine — and thus the
 // real SYNC snap — works in the browser dev/e2e build too.
@@ -150,6 +180,7 @@ export default defineConfig({
   },
   plugins: [
     defaultToBrowserHtml(),
+    finalizeBrowserBuild(),
     buildWorklets(),
     react(),
     serveWorklets(),
