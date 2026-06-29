@@ -35,13 +35,16 @@ function buildWorklets(): Plugin {
 
 // Land on browser.html at "/" — index.html is the ELECTRON entry (no window.dj),
 // so serving it in the browser crashes the Library. Redirect so any URL works.
+// NOTE: do NOT add ?demo here — that flag forces the synthetic test tracks (The Who etc.)
+// and bypasses the real bundled demo-songs library. e2e that wants the synth seed passes
+// ?demo explicitly. (?gl just picks the GL waveform lane, harmless.)
 function defaultToBrowserHtml(): Plugin {
   return {
     name: 'default-browser-html',
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
         if (req.url === '/' || req.url === '/index.html') {
-          res.writeHead(302, { Location: '/browser.html?demo&gl' });
+          res.writeHead(302, { Location: '/browser.html?gl' });
           res.end();
           return;
         }
