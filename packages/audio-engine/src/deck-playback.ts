@@ -235,6 +235,19 @@ export class DeckPlayback {
       this.keylockScaler = new RubberBandScaler();
     }
     this.keylockScaler?.reset();
+    // Stem decks have a scaler per stem; re-prime them and align their cursors to the
+    // current position so the keylocked stem path starts clean (no stale buffer click).
+    for (let i = 0; i < this.stemScalers.length; i++) {
+      this.stemScalers[i]?.reset();
+      this.stemScalerCursor[i] = this.position;
+    }
+  }
+
+  /** True when any stem has a manual key shift (so the scaler path is needed regardless
+   * of keylock). */
+  private anyStemShift(): boolean {
+    for (const s of this.stemPitch) if (s !== 0) return true;
+    return false;
   }
 
   isKeylock(): boolean {
@@ -459,16 +472,28 @@ export class DeckPlayback {
     let produced = 0;
     let endPos = startPos;
 
+    // Keylock OR a key shift means the stems must run through their time-stretchers
+    // (tempo = speed, pitch = the shift ratio). Without this, stem decks varispeed and the
+    // pitch rises/falls with tempo — the "chipmunk" on a Smart Fader / sync tempo change.
+    // (Stem keylock used to be unimplemented; only manual key-shift hit the scaler path.)
+    const stemScaling = (this.keylock || this.anyStemShift()) && speed > 0.1 && speed < 1.9;
+
     for (let i = 0; i < this.stemResamplers.length; i++) {
       const gain = this.stemGains[i] ?? 0;
       const res = this.stemResamplers[i]!;
-      const scaler = this.stemScalers[i];
       const shift = this.stemPitch[i] ?? 0;
 
-      if (shift !== 0 && scaler && speed > 0.1 && speed < 1.9) {
-        // Pitch-shifted stem: tempo = speed (locked), pitch = 2^(semi/12). The scaler
-        // pulls source through THIS stem's own cursor so its buffering stays consistent.
-        scaler.setRatios(speed, Math.pow(2, shift / 12));
+      if (stemScaling) {
+        // Lazily create this stem's scaler (keylock can need it even with no key shift).
+        if (!this.stemScalers[i]) {
+          const s = new RubberBandScaler();
+          s.setFormantPreserved?.(this.formantPreserve);
+          this.stemScalers[i] = s;
+          this.stemScalerCursor[i] = this.position;
+        }
+        const scaler = this.stemScalers[i]!;
+        // tempo = speed (locked), pitch = 2^(semi/12) (1.0 when only keylock, no shift).
+        scaler.setRatios(speed, shift === 0 ? 1 : Math.pow(2, shift / 12));
         const pull: SourcePull = (chans, n) => {
           const r = res.pull(chans[0]!, chans[1] ?? chans[0]!, n, {
             position: this.stemScalerCursor[i]!,
@@ -494,7 +519,14 @@ export class DeckPlayback {
         continue;
       }
 
-      // Un-shifted stem (the fast path): linear pull, frame-aligned with the others.
+      // Linear pull (keylock off and no shift, OR speed out of the scaler's range):
+      // frame-aligned with the others. Keep this stem's scaler cursor tracking the
+      // authoritative position + re-prime it, so if scaling re-engages (keylock back on,
+      // speed back in range) it resumes cleanly with no jump/click.
+      if (this.stemScalers[i]) {
+        this.stemScalers[i]!.reset();
+        this.stemScalerCursor[i] = startPos;
+      }
       const r = res.pull(sL, sR, numFrames, {
         position: startPos, // every linear stem reads from the same spot
         ratio,
