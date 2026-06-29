@@ -2364,3 +2364,60 @@ input[type='range'].vfader::-webkit-slider-thumb {
   color: var(--accent);
   font-style: italic;
 }
+
+/* ── web-demo banner (only renders in the browser build) ───────────────── */
+.web-banner {
+  position: fixed;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  z-index: 2500;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: min(900px, 94vw);
+  padding: 10px 14px;
+  font-size: 12px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  border: 1px solid var(--edge-bright);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(8px);
+}
+.web-banner-warn {
+  color: var(--cue);
+}
+.web-banner-warn a,
+.web-banner-msg code {
+  color: var(--accent);
+}
+.web-banner-msg {
+  color: var(--text-dim);
+}
+.web-banner-msg code {
+  background: var(--sunken);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+}
+.web-banner-cta {
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--on-accent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent), #fff 15%), var(--accent));
+  border-radius: 6px;
+}
+.web-banner-x {
+  flex: 0 0 auto;
+  background: transparent;
+  border: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  font-size: 13px;
+}
+.web-banner-x:hover {
+  color: var(--text);
+}

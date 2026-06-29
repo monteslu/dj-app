@@ -15,6 +15,7 @@ import { MainControls } from './components/MainControls.js';
 import { TempoFader } from './components/Faders.js';
 import { WaveformBand } from './components/WaveformBand.js';
 import { Tooltip } from './components/Tooltip.js';
+import { WebBanner } from './components/WebBanner.js';
 import { startConsoleResize, clearConsoleHeight, applyConsoleHeight } from './panel-sizes.js';
 import { isDemo, seedDemo } from './demo.js';
 import { useTheme } from './theme.js';
@@ -130,6 +131,7 @@ function Stage(): React.JSX.Element {
         </span>
       </footer>
       <Tooltip />
+      <WebBanner />
     </div>
   );
 }
